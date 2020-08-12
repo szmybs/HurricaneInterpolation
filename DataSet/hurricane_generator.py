@@ -1,5 +1,8 @@
 import numpy as np
 import os
+import random
+
+from DataSet.extract import HurricaneExtraction
 
 # .\\IRMA\\Visible\\2017253
 class HurricaneGenerator(object):
@@ -15,7 +18,7 @@ class HurricaneGenerator(object):
             print("黑名单-白名单最多只能存在一种")
             return []
 
-        dirs = sorted(os.listdir(root_path))
+        dirs = random.shuffle(os.listdir(root_path))
         sift = []
 
         for di in dirs:
@@ -34,7 +37,7 @@ class HurricaneGenerator(object):
     
     @classmethod
     def one_dircetory_generator(self, data_path, batch_size=1, read_data_func=None):
-        datas = sorted(os.listdir(data_path))
+        datas = random.shuffle(os.listdir(data_path))
 
         x = []
         for data in datas:
@@ -78,6 +81,8 @@ def name_visibility_date_dir_generator(root_path, batch_size=1, read_data_func=N
                 while True:
                     try:
                         hdg = next(odg)
+                        hdg = HurricaneExtraction.convert_unsigned_to_float(hdg)  #在这里normlize
+                        hdg = HurricaneExtraction.normalize_using_physics(hdg)
                         yield(hdg)
                     except StopIteration:
                         break

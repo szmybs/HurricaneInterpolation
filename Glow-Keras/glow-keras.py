@@ -2,6 +2,7 @@ import numpy as np
 import os
 import math
 import time
+import sys
 
 from PIL import Image
 
@@ -13,8 +14,11 @@ from keras.optimizers import Adam
 
 from flow_layers import Squeeze
 
-from hurricane_generator import name_visibility_date_dir_generator, name_visibility_date_dir_data_counts
-from extract import HurricaneExtraction
+if __name__ == "__main__":
+    sys.path.append(os.getcwd())
+
+from Data.hurricane_generator import name_visibility_date_dir_generator, name_visibility_date_dir_data_counts
+from Data.extract import HurricaneExtraction
 
 
 class Glow(object):
@@ -36,20 +40,14 @@ class Glow(object):
         _in = Input(shape=(None, None, in_channel))
         _ = _in
         hidden_dim = 512
-        _ = Conv2D(hidden_dim,
-                (3, 3),
-                padding='same')(_)
+        _ = Conv2D(hidden_dim, (3, 3), padding='same')(_)
         # _ = Actnorm(add_logdet_to_loss=False)(_)
         _ = Activation('relu')(_)
-        _ = Conv2D(hidden_dim,
-                (1, 1),
-                padding='same')(_)
+        _ = Conv2D(hidden_dim, (1, 1), padding='same')(_)
         # _ = Actnorm(add_logdet_to_loss=False)(_)
         _ = Activation('relu')(_)
-        _ = Conv2D(in_channel,
-                (3, 3),
-                kernel_initializer='zeros',
-                padding='same')(_)
+        _ = Conv2D(in_channel, (3, 3), kernel_initializer='zeros', padding='same')(_)
+
         return Model(_in, _)
     
 
@@ -160,8 +158,6 @@ class Glow(object):
 
     def nparray_to_image(self, x):
         height, width, channel = self.data_shape
-        # x = HurricaneExtraction.convert_unsigned_to_float(x)
-        # x = HurricaneExtraction.normalize_using_physics(x)
 
         figure = np.zeros( (height * len(x), width * channel, 1) )
 
@@ -174,30 +170,20 @@ class Glow(object):
         return img
 
 
-    # def sample(self, path, std=1):
-    #     height, width, channel = self.data_shape[0], self.data_shape[1], self.data_shape[2]
+    def sample(self, save_path, epoch, n=9, std=1):
+        x = []
+
+        for i in range(n):
+            decoder_input_shape = (1,) + K.int_shape(self.decoder.inputs[0])[1:]
+            z_sample = np.array(np.random.randn(*decoder_input_shape)) * std
+            x_decoded = self.decoder.predict(z_sample)
+            digit = x_decoded[0].reshape(self.data_shape)
+            x.append(digit)
+
+        img = self.nparray_to_image(x)
+        save_name = str(epoch) + "_sampled" + ".tiff"
+        img.save(os.path.join(save_path, save_name))
         
-    #     for i in range()
-
-
-    # def sample(self, path, img_size, n=9, std=1):
-    #     image_size = self.data_shape
-
-    #     figure = np.zeros((height * n, width * n, channel))
-    #     for i in range(n):
-    #         for j in range(n):
-    #             decoder_input_shape = (1,) + K.int_shape(self.decoder.inputs[0])[1:]
-    #             z_sample = np.array(np.random.randn(*decoder_input_shape)) * std
-    #             x_decoded = self.decoder.predict(z_sample)
-    #             digit = x_decoded[0].reshape(img_size)
-
-    #             # 这里height width顺序可能有误
-    #             figure[i * height: (i + 1) * height, j * width: (j + 1) * width] = digit
-
-    #     figure = (figure + 1) / 2 * 255
-    #     figure = np.clip(figure, 0, 255).astype('uint8')
-    #     imageio.imwrite(path, figure)
-
 
     def reconsturt(self, data_root_path, save_path, epoch):
         x = []
@@ -208,18 +194,19 @@ class Glow(object):
             lv = self.encoder.predict(vd)
             re = self.decoder.predict(lv)
             x.append[re]
-        img = self.nparray_to_image(re)
+        img = self.nparray_to_image(x)
         save_name = str(epoch) + ".tiff"
         img.save(os.path.join(save_path, save_name))
 
 
+    # 在 hurrica_generator.py中浮点化和正则化
     def glow_generator(self, data_root_path, mode = 'train'):
         if mode == 'train':
-            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_black_list=self.validate_seperation)
+            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_black_list=self.validate_seperation, Visible=True)
         elif mode == 'validate':
-            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_white_list=self.validate_seperation)
+            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_white_list=self.validate_seperation, Visible=True)
         else:
-            gg = name_visibility_date_dir_generator(data_root_path)
+            gg = name_visibility_date_dir_generator(data_root_path, Visible=True)
 
         while True:
             gd = next(gg)
@@ -227,12 +214,30 @@ class Glow(object):
             yield(gd)
 
 
+    class Evaluate(Callback):
+        def __init__(self, data_root_path, save_model_path, sample_root_path):
+            self.lowest = 1e10
+            self.save_model_path = save_model_path
+            self.data_root_path = data_root_path
+            self.sample_root_path = sample_root_path
+
+        def on_epoch_end(self, epoch, logs=None):
+            Glow.sample(self.sample_root_path, epoch)
+            Glow.reconsturt(self.data_root_path, self.sample_root_path, epoch)
+
+            if logs['loss'] <= self.lowest:
+                self.lowest = logs['loss']
+                self.model.save_weights(os.path.join(self.save_model_path,'best_encoder.weights'))
+            elif logs['loss'] > 0 and epoch > 10:
+                """在后面，loss一般为负数，一旦重新变成正数，就意味着模型已经崩溃，需要降低学习率。"""
+                self.model.load_weights(os.path.join(self.save_model_path,'best_encoder.weights'))
+                K.set_value(self.model.optimizer.lr, self.model.optimizer.lr * 0.1)
+
+
     def train(self, epochs, sample_interval=10, **kwarg):
         data_root_path = kwarg['drp']
-        save_model_path = kwarg['swp']
-
-        if kwarg['srp'] is not None:
-            sample_root_path = kwarg['srp']
+        save_model_path = kwarg['smp']
+        sample_root_path = kwarg['srp']
 
         # model
         self.build_model(self.data_shape)
@@ -257,25 +262,9 @@ class Glow(object):
                         verbose=1, 
                         save_best_only=False, 
                         period=sample_interval)
-        
+
         # evaluate
-        class Evaluate(Callback):
-            def __init__(self, save_model_path, sample_root_path, sample_func):
-                self.lowest = 1e10
-                self.save_model_path = save_model_path
-                self.sample_root_path = sample_root_path
-                self.sample_func = sample_func
-
-            def on_epoch_end(self, epoch, logs=None):
-                if logs['loss'] <= self.lowest:
-                    self.lowest = logs['loss']
-                    self.model.save_weights(os.path.join(self.save_model_path,'best_encoder.weights'))
-                elif logs['loss'] > 0 and epoch > 10:
-                    """在后面，loss一般为负数，一旦重新变成正数，就意味着模型已经崩溃，需要降低学习率。"""
-                    self.model.load_weights(os.path.join(self.save_model_path,'best_encoder.weights'))
-                    K.set_value(self.model.optimizer.lr, self.model.optimizer.lr * 0.1)
-
-        evaluate = Evaluate(save_model_path, self.sample, self.sample)
+        evaluate = Evaluate(data_root_path, save_model_path, sample_root_path)
 
         # fit_generator
         try:
@@ -296,3 +285,18 @@ class Glow(object):
         except KeyboardInterrupt:
             print("Training duration (s): {}\nInterrupted by user!".format(trainingDuration))
         print("Training duration (s): {}".format(trainingDuration))
+
+
+
+if __name__ == "__main__":
+    data_root_path = "./DataSet/Data/"
+    save_model_path = "./Glow-Keras/Model/"
+    sample_root_path = "./Glow-Keras/Sample/"
+
+    if os.path.exists(save_model_path):
+        os.mkdir(save_model_path)
+    if os.path.exists(sample_root_path):
+        os.mkdir(sample_root_path)
+
+    glow = Glow()
+    glow.train(20, drp=data_root_path, smp=save_model_path, srp=save_model_path)
