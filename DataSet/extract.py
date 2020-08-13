@@ -2,9 +2,13 @@ from netCDF4 import Dataset
 import numpy as np
 import os
 import math
-
 import datetime
-from sunrise_sunset import SunriseSunset
+
+import sys
+if __name__ == "__main__":
+    sys.path.append(os.getcwd())   
+
+from DataSet.sunrise_sunset import SunriseSunset
 
 
 GOES_CHANNELS = ('M3C01', 'M3C07', 'M3C09', 'M3C14', 'M3C15')

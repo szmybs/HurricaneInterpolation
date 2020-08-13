@@ -1,7 +1,13 @@
 import numpy as np
 import os
-from hurricane_generator import HurricaneGenerator
-from extract import HurricaneExtraction
+import sys
+
+if __name__ == "__main__":
+    sys.path.append(os.getcwd())   
+
+from DataSet.hurricane_generator import HurricaneGenerator
+from DataSet.extract import HurricaneExtraction
+
 
 class FixedScale(object):
     def __init__(self):
@@ -72,9 +78,11 @@ def goes16_5channels_scale_dir(root_path, save_path, read_data_func):
 
 
 if __name__ == "__main__":
-    root_path = "./Data/NpyData/"
-    save_path = "./Data/ScaledData/"
+    root_path = "./DataSet/Data/"
+    save_path = "./DataSet/ScaledData/"
 
+    if os.path.exists(save_path) ==False:
+        os.mkdir(save_path)
     goes16_5channels_scale_dir(root_path, save_path, HurricaneExtraction.read_extraction_data)
 
     
