@@ -67,7 +67,7 @@ def goes16_5channels_scale_dir(root_path, save_path, read_data_func):
                     dp = os.path.join(date_dir, df)
                     d = read_data_func(dp)
                     #d = HurricaneExtraction.convert_unsigned_to_float(d)
-                    dfs = FixedScale.scale_to_fixed_size(d, 256)
+                    dfs = FixedScale.scale_to_fixed_size(d, 32)
                     dfs = (np.asarray(dfs)).astype(np.uint16)
                     dfs = np.rollaxis(dfs, 0, 3)                         # C,H,W -> H,W,C
 
@@ -79,7 +79,7 @@ def goes16_5channels_scale_dir(root_path, save_path, read_data_func):
 
 if __name__ == "__main__":
     root_path = "./DataSet/Data/"
-    save_path = "./DataSet/ScaledData/"
+    save_path = "./DataSet/ScaledData32/"
 
     if os.path.exists(save_path) ==False:
         os.mkdir(save_path)
