@@ -30,17 +30,17 @@ class Evaluate(Callback):
         self.reconstrut = reconstrut
 
     def on_epoch_end(self, epoch, logs=None):
-        if (epoch+1）% 10 == 0:
-            self.sample(save_path=self.srp, epoch=epoch)
-            self.reconstrut(data_root_path=self.drp, save_path=self.srp, epoch=epoch)
+        if (epoch+1) % 10 == 0:
+            self.sample(save_path=self.srp, epoch=(epoch+1))
+            self.reconstrut(data_root_path=self.drp, save_path=self.srp, epoch=(epoch+1))
 
         if logs['loss'] <= self.lowest:
             self.lowest = logs['loss']
             self.model.save_weights(os.path.join(self.smp,'best_encoder.weights'))
-        elif logs['loss'] > 0 and epoch > 10:
+        elif logs['loss'] > 0 and epoch > 15:
             """在后面，loss一般为负数，一旦重新变成正数，就意味着模型已经崩溃，需要降低学习率。"""
             self.model.load_weights(os.path.join(self.smp,'best_encoder.weights'))
-            K.set_value(self.model.optimizer.lr, self.model.optimizer.lr * 0.1)
+            K.set_value(self.model.optimizer.lr, K.get_value(self.model.optimizer.lr) * 0.1)
 
 
 
@@ -50,11 +50,11 @@ class Glow(object):
         self.learning_rate = 1e-4
 
         self.level = 3
-        self.depth = 10
+        self.depth = 8
 
         self.validate_seperation = 'LIDIA'
 
-        self.data_shape = (256, 256, 5)
+        self.data_shape = (32, 32, 5)
 
 
     def build_basic_model(self, in_channel):
@@ -62,7 +62,7 @@ class Glow(object):
         """
         _in = Input(shape=(None, None, in_channel))
         _ = _in
-        hidden_dim = 512
+        hidden_dim = 128        # 512->128
         _ = Conv2D(hidden_dim, (3, 3), padding='same')(_)
         # _ = Actnorm(add_logdet_to_loss=False)(_)
         _ = Activation('relu')(_)
@@ -292,7 +292,7 @@ class Glow(object):
 
 
 if __name__ == "__main__":
-    data_root_path = "./DataSet/ScaledData/"
+    data_root_path = "./DataSet/ScaledData32/"
     save_model_path = "./GlowKeras/Model/"
     sample_root_path = "./GlowKeras/Sample/"
 
