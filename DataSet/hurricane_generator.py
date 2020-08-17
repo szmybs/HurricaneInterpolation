@@ -6,18 +6,26 @@ import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
-from DataSet.extract import HurricaneExtraction
+from DataSet.normalize import Quantization, Normalize
 
 # .\\IRMA\\Visible\\2017253
 class HurricaneGenerator(object):
     def __init__(self):
         pass
     
+
     @classmethod
-    def directory_downstream(self, root_path, white_list=None, black_list=None):
+    def directory_downstream(self, root_path, wbl={}):
         if os.path.isdir(root_path) == False:
             return []
+        
+        white_list, black_list = None, None
 
+        if 'white_list'in wbl:
+            white_list = wbl['white_list']
+        if 'black_list'in wbl:
+            black_list = wbl['black_list']
+        
         if white_list is not None and black_list is not None:
             print("黑名单-白名单最多只能存在一种")
             return []
@@ -39,7 +47,23 @@ class HurricaneGenerator(object):
             sift.append(di_path)
         
         return sift
-    
+
+
+    @classmethod
+    def leaf_directory_generator(self, root_path, wbl=[]):
+        path = [root_path]
+
+        for li in wbl:
+            new_path = []
+            for pth in path:
+                dirs = HurricaneGenerator.directory_downstream(pth, li)
+                new_path = new_path + dirs
+            path.clear()
+            path = new_path
+        
+        return path
+
+
     @classmethod
     def one_dircetory_generator(self, data_path, batch_size=1, read_data_func=None):
         datas = os.listdir(data_path)
@@ -53,46 +77,27 @@ class HurricaneGenerator(object):
                 yield(np.array(x))
 
 
-
-def name_visibility_date_dir_generator(root_path, batch_size=1, read_data_func=None, **kwarg):
+def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_size=1, wbl=[{}, {}, {}]):
     def read_npy_hurricane_data(file_path):
         return np.load(file_path)
 
     if read_data_func is None:
         read_data_func = read_npy_hurricane_data
     
+    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path, wbl)
+
     while True:
-
-        if 'hurricane_name_white_list' in kwarg:
-            name_dirs = HurricaneGenerator.directory_downstream(root_path, white_list=kwarg['hurricane_name_white_list'])
-        elif 'hurricane_name_black_list' in kwarg:
-            name_dirs = HurricaneGenerator.directory_downstream(root_path, black_list=kwarg['hurricane_name_black_list'])
-        else:
-            name_dirs = HurricaneGenerator.directory_downstream(root_path)
-
-        for name_dir in name_dirs:
-
-            if 'Visible' in kwarg:
-                visibility_dirs = HurricaneGenerator.directory_downstream(name_dir, white_list=kwarg['Visible'])
-            elif 'Invisible' in kwarg:
-                visibility_dirs = HurricaneGenerator.directory_downstream(name_dir, white_list=kwarg['Invisible'])
-            else:
-                visibility_dirs = HurricaneGenerator.directory_downstream(name_dir)
-
-            for visibility_dir in visibility_dirs:
-
-                date_dirs = HurricaneGenerator.directory_downstream(visibility_dir)
-                for date_dir in date_dirs:
-
-                    odg = HurricaneGenerator.one_dircetory_generator(date_dir, batch_size, read_data_func)  #使用读取npy的内部函数
-                    while True:
-                        try:
-                            hdg = next(odg)
-                            hdg = HurricaneExtraction.convert_unsigned_to_float(hdg)  #在这里normlize
-                            hdg = HurricaneExtraction.normalize_using_physics(hdg)
-                            yield(hdg)
-                        except StopIteration:
-                            break
+        random.shuffle(leaf_directory)
+        for ld in leaf_directory:
+            odg = HurricaneGenerator.one_dircetory_generator(ld, batch_size, read_data_func)
+            while True:
+                try:
+                    hdg = next(odg)
+                    hdg = Quantization.convert_unsigned_to_float(hdg)      # 这里转化为浮点数
+                    #hdg = HurricaneExtraction.normalize_using_physics(hdg)
+                    yield(hdg)
+                except StopIteration:
+                    break
 
 
 def name_visibility_date_dir_data_counts(root_path, black_list=None):
@@ -128,16 +133,6 @@ def name_visibility_date_dir_data_counts(root_path, black_list=None):
 
 
 if __name__ == "__main__":
-    # black_list = ['Visible']
-    # dirs = name_visibility_date_dir_data_counts(".\\Data\\NpyData\\", black_list=None)
-    # print(dirs)
-
-    root_path = "./DataSet/ScaledData/"
-    nvdd = name_visibility_date_dir_generator(root_path, 8)
-
-    for i in range(10):
-        tmp = next(nvdd)
-        print(tmp)
-
+    pass
 
 

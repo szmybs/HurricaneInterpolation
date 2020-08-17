@@ -19,6 +19,7 @@ from GlowKeras.flow_layers import *
 
 from DataSet.hurricane_generator import name_visibility_date_dir_generator, name_visibility_date_dir_data_counts
 from DataSet.extract import HurricaneExtraction
+from DataSet.normalize import Normalize, Quantization
 
 
 
@@ -196,7 +197,7 @@ class Glow(object):
     def sample(self, save_path, epoch, n=9, std=0.9):
         x = []
 
-        for i in range(n):
+        for _ in range(n):
             decoder_input_shape = (1,) + K.int_shape(self.decoder.inputs[0])[1:]
             z_sample = np.array(np.random.randn(*decoder_input_shape)) * std
             x_decoded = self.decoder.predict(z_sample)
@@ -212,7 +213,7 @@ class Glow(object):
         x = []
 
         validate_data_generator = self.glow_generator(data_root_path, mode='validate')
-        for i in range(9):
+        for _ in range(9):
             vd = next(validate_data_generator)
             lv = self.encoder.predict(vd[0])
             re = self.decoder.predict(lv)
@@ -225,14 +226,25 @@ class Glow(object):
     # 在 hurrica_generator.py中浮点化和正则化
     def glow_generator(self, data_root_path, mode = 'train'):
         if mode == 'train':
-            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_black_list=self.validate_seperation, Visible='Visible')
+            gg = name_visibility_date_dir_generator(root_path=data_root_path, 
+                                        batch_size=self.batch_size, 
+                                        wbl=[ {'black_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         elif mode == 'validate':
-            gg = name_visibility_date_dir_generator(data_root_path, hurricane_name_white_list=self.validate_seperation, Visible='Visible')
+            gg = name_visibility_date_dir_generator(root_path=data_root_path, 
+                                        batch_size=self.batch_size, 
+                                        wbl=[ {'white_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         else:
-            gg = name_visibility_date_dir_generator(data_root_path, Visible='Visible')
+            gg = name_visibility_date_dir_generator(root_path=data_root_path, 
+                                        batch_size=self.batch_size, 
+                                        wbl=[ {}, {'white_list':['Visible']}, {} ])
+
+        if hasattr(self, 'normalize') == False:
+            self.normalize = Normalize(data_path=data_root_path)
 
         while True:
             gdx = next(gg)
+            #在这里正则化
+            gdx = self.normalize.normalize_using_physics(gdx)
             gdy = gdx.reshape( gdx.shape[0], -1) 
             yield(gdx, gdy)
 
