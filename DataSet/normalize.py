@@ -6,7 +6,7 @@ import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
-from DataSet.hurricane_generator import HurricaneGenerator
+import DataSet.hurricane_generator as DH
 
 
 class Quantization(object):
@@ -120,7 +120,7 @@ class Normalize(object):
 
     def normalize_using_std_gaussian(self, data, path):
         if os.path.exists(path) == False:
-            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
+            lds = DH.HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
             files = []
             for ld in lds:
                 f = glob.glob(pathname=os.path.join(ld, '*.npy'))
@@ -167,7 +167,7 @@ class Normalize(object):
 
     def normalize_using_max_min(self, data, path, mode=0):
         if os.path.exists(path) == False:
-            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
+            lds = DH.HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
             files = []
             for ld in lds:
                 f = glob.glob(pathname=os.path.join(ld, '*.npy'))

@@ -78,18 +78,18 @@ def goes16_5channels_scale_dir(root_path, save_path, read_data_func):
 
 
 if __name__ == "__main__":
-    # root_path = "./DataSet/Data/"
-    # save_path = "./DataSet/ScaledData32/"
-
-    # if os.path.exists(save_path) ==False:
-    #     os.mkdir(save_path)
-    # goes16_5channels_scale_dir(root_path, save_path, HurricaneExtraction.read_extraction_data)
-
-    root_path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\NpyData\\"
-    save_path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ScaledData32\\"
+    root_path = "./DataSet/Data/"
+    save_path = "./DataSet/ScaledData32/"
 
     if os.path.exists(save_path) ==False:
         os.mkdir(save_path)
     goes16_5channels_scale_dir(root_path, save_path, HurricaneExtraction.read_extraction_data)
+
+    # root_path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\NpyData\\"
+    # save_path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ScaledData32\\"
+
+    # if os.path.exists(save_path) ==False:
+    #     os.mkdir(save_path)
+    # goes16_5channels_scale_dir(root_path, save_path, HurricaneExtraction.read_extraction_data)
 
     

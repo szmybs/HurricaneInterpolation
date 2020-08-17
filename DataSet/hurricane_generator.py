@@ -6,7 +6,7 @@ import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
-from DataSet.normalize import Quantization, Normalize
+import DataSet.normalize as DN
 
 # .\\IRMA\\Visible\\2017253
 class HurricaneGenerator(object):
@@ -93,7 +93,7 @@ def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_siz
             while True:
                 try:
                     hdg = next(odg)
-                    hdg = Quantization.convert_unsigned_to_float(hdg)      # 这里转化为浮点数
+                    hdg = DN.Quantization.convert_unsigned_to_float(hdg)      # 这里转化为浮点数
                     #hdg = HurricaneExtraction.normalize_using_physics(hdg)
                     yield(hdg)
                 except StopIteration:
