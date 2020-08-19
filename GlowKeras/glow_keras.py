@@ -20,7 +20,7 @@ from GlowKeras.flow_layers import *
 from DataSet.hurricane_generator import name_visibility_date_dir_generator, name_visibility_date_dir_data_counts
 from DataSet.extract import HurricaneExtraction
 from DataSet.normalize import Normalize, Quantization
-
+from GlowKeras.data_augmentation import rotation90, vertical_flip, mirror_flip
 
 
 class Evaluate(Callback):
@@ -56,6 +56,8 @@ class Glow(object):
         self.validate_seperation = 'LIDIA'
 
         self.data_shape = (32, 32, 5)
+
+        self.dam = [rotation90, vertical_flip, mirror_flip]
 
 
     def build_basic_model(self, in_channel):
@@ -240,13 +242,20 @@ class Glow(object):
 
         if hasattr(self, 'normalize') == False:
             self.normalize = Normalize(data_path=data_root_path)
-
+        
         while True:
             gdx = next(gg)
             #在这里正则化
             gdx = self.normalize.normalize_using_physics(gdx)
-            gdy = gdx.reshape( gdx.shape[0], -1) 
-            yield(gdx, gdy)
+
+            gadx = [gdx]
+            if mode == 'train':
+                for func in self.dam:
+                    gadx.append(func(gdx))
+
+            for dx in gadx:
+                dy = dx.reshape( dx.shape[0], -1) 
+                yield(dx, dy)
 
 
     def train(self, epochs, sample_interval=5, **kwarg):
@@ -266,7 +275,7 @@ class Glow(object):
         train_data_nums = name_visibility_date_dir_data_counts(data_root_path, black_list=[self.validate_seperation, 'Invisible'])
         validate_data_nums = name_visibility_date_dir_data_counts(data_root_path, black_list=['Invisible']) - train_data_nums
 
-        steps_per_epoch = math.floor( train_data_nums / self.batch_size )
+        steps_per_epoch = math.floor( train_data_nums / self.batch_size ) * (len(self.dam) + 1)
         steps_for_validate = math.floor( validate_data_nums / self.batch_size )
         
         # checkpoint
