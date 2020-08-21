@@ -263,7 +263,7 @@ class Glow(object):
         self.normalize = Normalize(data_path=data_root_path, gaussian_path=gaussian_path, max_min_path=max_min_path)
 
         self.norm_list = [self.normalize.normalize_using_physics,
-                        self.normalize.undo_normalize_using_max_min]
+                        self.normalize.normalize_using_max_min]
 
         self.undo_norm_list = [self.normalize.undo_normalize_using_max_min]
 
@@ -336,6 +336,12 @@ class Glow(object):
             print("Training duration (s): {}\nInterrupted by user!".format(trainingDuration))
         print("Training duration (s): {}".format(trainingDuration))
 
+
+    def load_weights(self, weights_path):
+        if hasattr(self, 'encoder') == False or hasattr(self, 'decoder') == False:
+            self.build_model(self.data_shape)
+        
+        self.encoder.load_weights(weights_path)
 
 
 if __name__ == "__main__":

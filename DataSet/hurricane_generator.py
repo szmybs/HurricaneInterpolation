@@ -13,7 +13,6 @@ class HurricaneGenerator(object):
     def __init__(self):
         pass
     
-
     @classmethod
     def directory_downstream(self, root_path, wbl={}):
         if os.path.isdir(root_path) == False:
@@ -77,6 +76,7 @@ class HurricaneGenerator(object):
                 yield(np.array(x))
 
 
+
 def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_size=1, wbl=[{}, {}, {}]):
     def read_npy_hurricane_data(file_path):
         return np.load(file_path)
@@ -98,6 +98,7 @@ def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_siz
                     yield(hdg)
                 except StopIteration:
                     break
+
 
 
 def name_visibility_date_dir_data_counts(root_path, black_list=None):
@@ -130,6 +131,34 @@ def name_visibility_date_dir_data_counts(root_path, black_list=None):
     
     return count
 
+
+
+def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch_size=1, length=3, wbl=[{}, {}, {}]):
+    def read_npy_hurricane_data(file_path):
+        return np.load(file_path)
+
+    if read_data_func is None:
+        read_data_func = read_npy_hurricane_data
+    
+    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path, wbl)
+
+    while True:
+        random.shuffle(leaf_directory)
+        for ld in leaf_directory:
+            odg = HurricaneGenerator.one_dircetory_generator(ld, batch_size, read_data_func)
+
+            seq = []
+            while True:
+                try:
+                    hdg = next(odg)
+                    hdg = Quantization.convert_unsigned_to_float(hdg)
+
+                    seq.append(hdg)
+                    if len(seq) % length == 0:
+                        yield(seq)
+                        seq.clear()
+                except StopIteration:
+                    break
 
 
 if __name__ == "__main__":
