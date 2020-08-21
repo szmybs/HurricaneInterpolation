@@ -78,7 +78,7 @@ class Glow(object):
     
 
     def compile(self):
-        optimizer = Adam(lr=self.learning_rate)
+        optimizer = Adam(lr=self.learning_rate, decay=1e-5)
         self.encoder.compile(loss=lambda y_true,y_pred: 0.5 * K.sum(y_pred**2, 1) + 0.5 * np.log(2*np.pi) * K.int_shape(y_pred)[1],
                 optimizer=optimizer)
         
@@ -204,6 +204,7 @@ class Glow(object):
             z_sample = np.array(np.random.randn(*decoder_input_shape)) * std
             x_decoded = self.decoder.predict(z_sample)
             digit = x_decoded[0].reshape(self.data_shape)
+            digit = self.hurricane_undo_normalize(digit)   # 在这里需要一个undo_normalize
             x.append(digit)
 
         img = self.nparray_to_image(x)
@@ -219,6 +220,7 @@ class Glow(object):
             vd = next(validate_data_generator)
             lv = self.encoder.predict(vd[0])
             re = self.decoder.predict(lv)
+            re = self.hurricane_undo_normalize(re)   # 在这里需要一个undo_normalize
             x.append(re)
         img = self.nparray_to_image(x)
         save_name = str(epoch) + ".tiff"
@@ -233,20 +235,16 @@ class Glow(object):
                                         wbl=[ {'black_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         elif mode == 'validate':
             gg = name_visibility_date_dir_generator(root_path=data_root_path, 
-                                        batch_size=self.batch_size, 
                                         wbl=[ {'white_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         else:
             gg = name_visibility_date_dir_generator(root_path=data_root_path, 
                                         batch_size=self.batch_size, 
                                         wbl=[ {}, {'white_list':['Visible']}, {} ])
-
-        if hasattr(self, 'normalize') == False:
-            self.normalize = Normalize(data_path=data_root_path)
         
         while True:
             gdx = next(gg)
             #在这里正则化
-            gdx = self.normalize.normalize_using_physics(gdx)
+            gdx = self.hurricane_normalize(gdx)
 
             gadx = [gdx]
             if mode == 'train':
@@ -258,6 +256,32 @@ class Glow(object):
                 yield(dx, dy)
 
 
+    def create_norm_list(self, data_root_path, gaussian_path=None, max_min_path=None):
+        if hasattr(self, 'normalize'):
+            return
+        
+        self.normalize = Normalize(data_path=data_root_path, gaussian_path=gaussian_path, max_min_path=max_min_path)
+
+        self.norm_list = [self.normalize.normalize_using_physics,
+                        self.normalize.undo_normalize_using_max_min]
+
+        self.undo_norm_list = [self.normalize.undo_normalize_using_max_min]
+
+    def hurricane_normalize(self, data):
+        if hasattr(self, 'norm_list') == False or len(self.norm_list) <= 0:
+            return data           
+        for norm in self.norm_list:
+            data = norm(data)
+        return data
+
+    def hurricane_undo_normalize(self, data):
+        if hasattr(self, 'undo_norm_list') == False or len(self.undo_norm_list) <= 0:
+            return data  
+        for unnorm in self.undo_norm_list:
+            data = unnorm(data)
+        return data
+
+
     def train(self, epochs, sample_interval=5, **kwarg):
         data_root_path = kwarg['drp']
         save_model_path = kwarg['smp']
@@ -266,6 +290,8 @@ class Glow(object):
         # model
         self.build_model(self.data_shape)
         self.compile()
+
+        self.create_norm_list(data_root_path, "./DataSet/norm_factor/gaussian.npz", "./DataSet/norm_factor/max_min.npz")
 
         # generator
         train_data_generator = self.glow_generator(data_root_path)
@@ -323,7 +349,7 @@ if __name__ == "__main__":
         os.mkdir(sample_root_path)
 
     glow = Glow()
-    glow.train(100, drp=data_root_path, smp=save_model_path, srp=sample_root_path)
+    glow.train(150, drp=data_root_path, smp=save_model_path, srp=sample_root_path)
 
     # gg = glow.glow_generator(data_root_path)
     # for i in range(10):

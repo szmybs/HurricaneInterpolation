@@ -6,64 +6,15 @@ import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
-import DataSet.hurricane_generator as DH
+from DataSet.quantization import Quantization
+from DataSet.hurricane_generator import HurricaneGenerator
 
-
-class Quantization(object):
-    def __init__(self):
-        pass
-
-    @classmethod
-    def convert_float_to_unsigned(self, float_data):
-        scale_factor = (0.812106364, 0.001564351, 0.022539101,
-                        0.049492208, 0.052774108)
-        add_offset = (-25.93664701, -0.03760000, -0.82360000,
-                      -1.71870000, -1.75580000)
-        
-        if isinstance(float_data, list):
-            unsigned_data = []
-            for i in range(len(float_data)):
-                tmp = (float_data[i] - add_offset[i]) / scale_factor[i]
-                tmp = np.around(tmp, 0)
-                tmp = tmp.astype(np.uint16)
-                unsigned_data.append(tmp)
-            return unsigned_data
-        
-        if isinstance(float_data, np.ndarray):
-            sf = np.array(scale_factor)
-            ao = np.array(add_offset)
-
-            unsigned_data = np.divide( np.subtract(float_data - ao), sf )
-            unsigned_data = (np.around(unsigned_data, 0)).astype(np.uint16)
-            return unsigned_data 
-
-    @classmethod
-    def convert_unsigned_to_float(self, unsigned_data):
-        scale_factor = (0.812106364, 0.001564351, 0.022539101,
-                        0.049492208, 0.052774108)
-        add_offset = (-25.93664701, -0.03760000, -0.82360000,
-                      -1.71870000, -1.75580000)
-        
-        if isinstance(unsigned_data, list):
-            float_data = []
-            for i in range(len(unsigned_data)):
-                tmp = unsigned_data[i] * scale_factor[i] + add_offset[i]
-                tmp = tmp.astype(np.float32)
-                float_data.append(tmp)
-            return float_data
-        
-        if isinstance(unsigned_data, np.ndarray):
-            sf = np.array(scale_factor)
-            ao = np.array(add_offset)
-
-            float_data = np.add( np.multiply( unsigned_data, sf ), ao)
-            float_data = float_data.astype(np.float32)
-            return float_data
- 
 
 class Normalize(object):
-    def __init__(self, data_path):
+    def __init__(self, data_path, gaussian_path=None, max_min_path=None):
         self.data_path = data_path
+        self.gaussian_path = gaussian_path
+        self.max_min_path = max_min_path
     
 
     '''
@@ -118,9 +69,9 @@ class Normalize(object):
             return unnorm_data
 
 
-    def normalize_using_std_gaussian(self, data, path):
-        if os.path.exists(path) == False:
-            lds = DH.HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
+    def normalize_using_std_gaussian(self, data):
+        if os.path.exists(self.gaussian_path) == False:
+            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
             files = []
             for ld in lds:
                 f = glob.glob(pathname=os.path.join(ld, '*.npy'))
@@ -128,7 +79,7 @@ class Normalize(object):
             
             means = []
             for fi in files:
-                fptr = np.open(fi)
+                fptr = np.load(fi)
                 fptr = Quantization.convert_unsigned_to_float(fptr)
                 means.append( np.mean(fptr, axis=(0, 1)) )
             means = np.array(means)
@@ -144,19 +95,19 @@ class Normalize(object):
             var = np.array(var)
             var = np.mean(var, axis=0)
             std = np.power(var, 0.5)            
-            np.savez(file=path, mean=means, std=std)
+            np.savez(file=self.gaussian_path, mean=means, std=std)
 
         if hasattr(self, 'mean') == False or hasattr(self, 'std') == False:
-            dptr = np.load(path)
+            dptr = np.load(self.gaussian_path)
             self.mean = dptr['mean']
             self.std = dptr['std']
         
-        return  np.divide( np.subtract(data - self.mean), self.std )
+        return  np.divide( np.subtract(data, self.mean), self.std )
 
-    def undo_normalize_using_std_gaussian(self, data, path):
+    def undo_normalize_using_std_gaussian(self, data):
         try:
             if hasattr(self, 'mean') == False or hasattr(self, 'std') == False:
-                dptr = np.load(path)
+                dptr = np.load(self.gaussian_path)
                 self.mean = dptr['mean']
                 self.std = dptr['std']
             return np.add( np.multiply(data, self.std), self.mean )
@@ -165,9 +116,9 @@ class Normalize(object):
             return data
 
 
-    def normalize_using_max_min(self, data, path, mode=0):
-        if os.path.exists(path) == False:
-            lds = DH.HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
+    def normalize_using_max_min(self, data, mode=0):
+        if os.path.exists(self.max_min_path) == False:
+            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
             files = []
             for ld in lds:
                 f = glob.glob(pathname=os.path.join(ld, '*.npy'))
@@ -184,26 +135,26 @@ class Normalize(object):
             MAX = np.amax(MAX, axis=0)
             MIN = np.amin(MIN, axis=0)
          
-            np.savez(file=path, max=MAX, min=MIN)
+            np.savez(file=self.max_min_path, max=MAX, min=MIN)
 
         if hasattr(self, 'max') == False and hasattr(self, 'min') == False:
-            dptr = np.load(path)
+            dptr = np.load(self.max_min_path)
             self.max = dptr['max']
             self.min = dptr['min']
         
         if mode == 0:
-            return  np.divide( np.subtract(data - self.min), np.subtract(self.max - self.min) )
-        return np.divide( np.subtract(data - self.min), np.subtract(self.max - self.min)/2 ) - 1
+            return  np.divide( np.subtract(data, self.min), np.subtract(self.max, self.min) )
+        return np.divide( np.subtract(data, self.min), np.subtract(self.max, self.min)/2 ) - 1
 
-    def undo_normalize_using_max_min(self, data, path, mode=0):
+    def undo_normalize_using_max_min(self, data, mode=0):
         try:
             if hasattr(self, 'max') == False or hasattr(self, 'min') == False:
-                dptr = np.load(path)
+                dptr = np.load(self.max_min_path)
                 self.mean = dptr['max']
                 self.std = dptr['min']
             if mode == 0:
                 return np.add( np.multiply(data, np.subtract(self.max, self.min)), self.min )
-            return np.add( np.multiply( (data + 1),  np.subtract(self.max - self.min)/2 ), self.min )
+            return np.add( np.multiply( (data + 1),  np.subtract(self.max, self.min)/2 ), self.min )
         except OSError:
             print("需求文件打不开")
             return data
