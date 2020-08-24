@@ -33,7 +33,7 @@ class HurricaneGenerator(object):
         if mode == 'random':
             random.shuffle(dirs)
         elif mode == 'sort':
-            sorted(dirs)
+            dirs.sort()
         sift = []
 
         for di in dirs:
@@ -72,7 +72,7 @@ class HurricaneGenerator(object):
         if mode == 'random':
             random.shuffle(datas)
         elif mode == 'sort':
-            sorted(datas)
+            datas.sort()
 
         x = []
         for data in datas:
