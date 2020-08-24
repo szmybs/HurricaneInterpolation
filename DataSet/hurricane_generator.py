@@ -80,6 +80,7 @@ class HurricaneGenerator(object):
             x.append(read_data_func(dp))
             if len(x) == batch_size:
                 yield(np.array(x))
+                x.clear()
 
 
 
@@ -152,17 +153,17 @@ def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch
         random.shuffle(leaf_directory)
         for ld in leaf_directory:
             odg = HurricaneGenerator.one_dircetory_generator(data_path=ld, batch_size=batch_size, mode='sort', read_data_func=read_data_func)
-
+                   
             seq = []
             while True:
                 try:
-                    hdg = next(odg)
-                    hdg = Quantization.convert_unsigned_to_float(hdg)
+                    while len(seq) < length:
+                        hdg = next(odg)
+                        hdg = Quantization.convert_unsigned_to_float(hdg)
+                        seq.append(hdg)
 
-                    seq.append(hdg)
-                    if len(seq) % length == 0:
-                        yield(seq)
-                        seq.clear()
+                    yield(seq)
+                    seq.clear()
                 except StopIteration:
                     break
 

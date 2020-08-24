@@ -37,6 +37,8 @@ for _ in range(9):
     sd1i = glow.hurricane_undo_normalize(sd1i)
 
     sd1 = sds[1]
+    sd1 = glow.hurricane_normalize(sd1)
+    sd1 = glow.hurricane_undo_normalize(sd1)
 
     tmp.append(sd1)
     tmp.append(sd1i)
