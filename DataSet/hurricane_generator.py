@@ -14,7 +14,7 @@ class HurricaneGenerator(object):
         pass
     
     @classmethod
-    def directory_downstream(self, root_path, wbl={}):
+    def directory_downstream(self, root_path, mode='random', wbl={}):
         if os.path.isdir(root_path) == False:
             return []
         
@@ -30,7 +30,10 @@ class HurricaneGenerator(object):
             return []
 
         dirs = os.listdir(root_path)
-        random.shuffle(dirs)
+        if mode == 'random':
+            random.shuffle(dirs)
+        elif mode == 'sort':
+            sorted(dirs)
         sift = []
 
         for di in dirs:
@@ -49,13 +52,13 @@ class HurricaneGenerator(object):
 
 
     @classmethod
-    def leaf_directory_generator(self, root_path, wbl=[]):
+    def leaf_directory_generator(self, root_path, mode='random', wbl=[]):
         path = [root_path]
 
         for li in wbl:
             new_path = []
             for pth in path:
-                dirs = HurricaneGenerator.directory_downstream(pth, li)
+                dirs = HurricaneGenerator.directory_downstream(pth, mode, li)
                 new_path = new_path + dirs
             path.clear()
             path = new_path
@@ -64,9 +67,12 @@ class HurricaneGenerator(object):
 
 
     @classmethod
-    def one_dircetory_generator(self, data_path, batch_size=1, read_data_func=None):
+    def one_dircetory_generator(self, data_path, batch_size=1, mode='random', read_data_func=None):
         datas = os.listdir(data_path)
-        random.shuffle(datas)
+        if mode == 'random':
+            random.shuffle(datas)
+        elif mode == 'sort':
+            sorted(datas)
 
         x = []
         for data in datas:
@@ -140,12 +146,12 @@ def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch
     if read_data_func is None:
         read_data_func = read_npy_hurricane_data
     
-    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path, wbl)
+    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path=root_path, mode='sort', wbl=wbl)
 
     while True:
         random.shuffle(leaf_directory)
         for ld in leaf_directory:
-            odg = HurricaneGenerator.one_dircetory_generator(ld, batch_size, read_data_func)
+            odg = HurricaneGenerator.one_dircetory_generator(data_path=ld, batch_size=batch_size, mode='sort', read_data_func=read_data_func)
 
             seq = []
             while True:
