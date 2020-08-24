@@ -91,12 +91,12 @@ def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_siz
     if read_data_func is None:
         read_data_func = read_npy_hurricane_data
     
-    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path, wbl)
+    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path=root_path, wbl=wbl)
 
     while True:
         random.shuffle(leaf_directory)
         for ld in leaf_directory:
-            odg = HurricaneGenerator.one_dircetory_generator(ld, batch_size, read_data_func)
+            odg = HurricaneGenerator.one_dircetory_generator(ld, batch_size, 'random', read_data_func)
             while True:
                 try:
                     hdg = next(odg)
