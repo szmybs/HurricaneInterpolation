@@ -55,7 +55,7 @@ class Glow(object):
 
         self.validate_seperation = 'LIDIA'
 
-        self.data_shape = (32, 32, 5)
+        self.data_shape = (256, 256, 5)
 
         self.dam = [rotation90, vertical_flip, mirror_flip]
 
@@ -345,7 +345,7 @@ class Glow(object):
 
 
 if __name__ == "__main__":
-    data_root_path = "./DataSet/ScaledData32/"
+    data_root_path = "./DataSet/ScaledData256/"
     save_model_path = "./GlowKeras/Model/"
     sample_root_path = "./GlowKeras/Sample/"
 
