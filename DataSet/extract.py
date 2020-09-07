@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
 from DataSet.sunrise_sunset import SunriseSunset
 from DataSet.normalize import Normalize, Quantization
-
+from GOES.goes import GOES
 
 GOES_CHANNELS = ('M3C01', 'M3C07', 'M3C09', 'M3C14', 'M3C15')
 
@@ -284,36 +284,7 @@ class HurricaneExtraction(object):
         self.save_path = save_path
         #print(type(self.hur_track[0][0]['Date']))
     
-
-    @classmethod
-    def navigating_from_geodetic_to_elevation_scanning_angle(self, latitude, longitude, lamb0):
-        phi = math.radians(latitude)
-        lamb = math.radians(longitude)
-        lamb0 = math.radians(lamb0)
-
-        req = 6378137  #goes_imagery_projection:semi_major_axis /meters
-        f = 298.257222096  #goes_imagery_projection:inverse_flattening
-        rpol = 6356752.31414 #goes_imagery_projection:semi_minor_axis /meters
-        e = 0.0818191910435
-        ggh = 35786023 #goes_imagery_projection:perspective_point_height
-        H = ggh + req
-
-        phiC = math.atan( rpol*rpol*math.tan(phi) / (req*req) )
-        rC = rpol / math.sqrt( 1 - math.pow(e*math.cos(phiC), 2) )
-
-        sx = H - rC * math.cos(phiC) * math.cos(lamb-lamb0)
-        sy = -1 * rC * math.cos(phiC) * math.sin(lamb-lamb0)
-        sz = rC * math.sin(phiC)
-
-        visible = H * (H-sx) - sy*sy - math.pow(req,2) * math.pow(sz,2) / math.pow(rpol,2)
-        if visible < 0:
-            return (-1, -1)
-        
-        y = math.atan2(sz, sx)
-        x = math.asin( -1*sy / math.sqrt( sx*sx + sy*sy + sz*sz ) )
-        return (y, x)
     
-
     # section = (纬度, 经度)  &  网格点以2km为标准 
     def hurricane_extraction(self, section=(224, 224)):
         def get_elevation_scanning_angle(lamb0):
@@ -321,7 +292,7 @@ class HurricaneExtraction(object):
             for hl in hur_loc:
                 if len(hl) <= 0:
                     continue
-                tmp = self.navigating_from_geodetic_to_elevation_scanning_angle(hl['Location'][0], hl['Location'][1], lamb0)
+                tmp = GOES.navigating_from_geodetic_to_elevation_scanning_angle(hl['Location'][0], hl['Location'][1], lamb0)
                 es_angle.append({'Location': tmp, 'Name': hl['Name']})
             return es_angle
         
@@ -473,18 +444,9 @@ class HurricaneExtractionRadM(HurricaneExtraction):
             for hl in hur_loc:
                 if len(hl) <= 0:
                     continue
-                tmp = self.navigating_from_geodetic_to_elevation_scanning_angle(hl['Location'][0], hl['Location'][1], lamb0)
+                tmp = GOES.navigating_from_geodetic_to_elevation_scanning_angle(hl['Location'][0], hl['Location'][1], lamb0)
                 es_angle.append({'Location': tmp, 'Name': hl['Name']})
             return es_angle
-
-        def judge_visibility():
-            visibility = {}
-            for hl in hur_loc:
-                if len(hl) <= 0:
-                    continue
-                vl = VisibleLight(date=time, latitude=hl['Location'][0], longitude=hl['Location'][1])
-                visibility[hl['Name']] = vl.isVisibility()
-            return visibility
 
         while True:
             try:
@@ -494,18 +456,24 @@ class HurricaneExtractionRadM(HurricaneExtraction):
 
                 time = data_list[0][0]
                 hur_loc = self.best_track.find_hurricane_location(time)
-                visibility = judge_visibility()
 
                 hur_extraction_data = {}
                 ex_angle = []
-                hur_name = ""
                 for dl in data_list:
                     g16nc = Dataset(dl[1])
 
                     if len(ex_angle) <= 0:
-                        ex_angle = get_elevation_scanning_angle(g16nc.variables['geospatial_lat_lon_extent'].geospatial_lon_nadir)
+                        nadir = g16nc.variables['geospatial_lat_lon_extent'].geospatial_lon_nadir
+                        ex_angle = get_elevation_scanning_angle(nadir)
+
                         y_image_bound = np.asarray(g16nc.variables['y_image_bounds'][:])
                         x_image_bound = np.asarray(g16nc.variables['x_image_bounds'][:])
+
+                        y_image_value = g16nc.variables['y_image_bounds'][0]
+                        x_image_value = g16nc.variables['x_image_bounds'][:]
+                        lati, longi = GOES.navigating_from_elevation_scanning_angle_to_geodetic(y_image_value, x_image_value, nadir)
+                        vl = VisibleLight(date=time, latitude=lati, longitude=longi)
+                        visibility = vl.isVisibility()
 
                         if (y_image_bound == np.array((-999,-999))).all() or (x_image_bound == np.array((-999,-999))).all():
                             g16nc.close()
@@ -544,7 +512,7 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                         hur_extraction_data[hur_name].append(rad)
                         #print('A')
                     g16nc.close()
-                self.save_extraction_data(hur_extraction_data, time, visibility)
+                self.save_extraction_data(hur_extraction_data, time, {hur_name:visibility})
             
             except StopIteration:
                 break
