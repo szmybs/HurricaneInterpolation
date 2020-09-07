@@ -465,7 +465,6 @@ class HurricaneExtraction(object):
         return data
 
 
-
 class HurricaneExtractionRadM(HurricaneExtraction):
     def hurricane_extraction(self, section=None):
 
@@ -508,6 +507,11 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                         y_image_bound = np.asarray(g16nc.variables['y_image_bounds'][:])
                         x_image_bound = np.asarray(g16nc.variables['x_image_bounds'][:])
 
+                        if (y_image_bound == np.array((-999,-999))).all() or (x_image_bound == np.array((-999,-999))).all():
+                            g16nc.close()
+                            print("文件出错了: %s " % (time))
+                            break
+
                         size = np.asarray ( (g16nc.variables['y'].size, g16nc.variables['x'].size) )
                         min_distance = np.sum(size)
 
@@ -516,7 +520,7 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                             ex_name = ex['Name']
 
                             hur_center = np.asarray(ex_loc)
-                        
+
                             y_eye_grid = ((hur_center[0] - y_image_bound[0]) / (y_image_bound[1] - y_image_bound[0])) * size[0]
                             x_eye_grid = ((hur_center[1] - x_image_bound[0]) / (x_image_bound[1] - x_image_bound[0])) * size[1]
                             eye_grid = np.asarray( (y_eye_grid, x_eye_grid), dtype=np.int32)
@@ -525,7 +529,7 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                             if dist < min_distance:
                                 min_distance = dist
                                 hur_name = ex_name
-                        if min_distance > np.sum(size/8):
+                        if min_distance > np.sum(size/4):
                             g16nc.close()
                             print("这不是一个台风: %s - %d" % (time, min_distance))
                             break
@@ -563,8 +567,8 @@ if __name__ == "__main__":
     # jd = time_format_convert('20170910')  #253
     # print(jd[0])
 
-    hur_data_path = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1\\ABI-L1b-RadM1\\'
-    best_track_file = 'D:\\Code\GOES-R-2017-HurricaneExtraction\\Data\\best-track\\2017-4hurricane-best-track.txt'
+    hur_data_path = '/GOES-16-Data/DATA/ABI-L1b-RadM/'
+    best_track_file = './DataSet/2017-4hurricane-best-track.txt'
 
-    he = HurricaneExtractionRadM(hur_data_path, best_track_file, 'D:\\Code\GOES-R-2017-HurricaneExtraction\\Data\\RadM-Npy\\', select_date=None)
+    he = HurricaneExtractionRadM(hur_data_path, best_track_file, './DataSet/Data-RadM/', select_date=None)
     he.hurricane_extraction()
