@@ -28,7 +28,7 @@ daylist = list(range(242, 276+1))
 channellist = ['M3C01', 'M3C07', 'M3C09', 'M3C14', 'M3C15']
 #channellist = ['C01','C02','C03','C04','C05','C06','C07','C08','C09','C10','C11','C12','C13','C14','C15','C16']
 
-
+# ORI_ABI-L1b-RadM1-M3C01_G16_s20172420000247_exx_cxx.nc
 def cut_file_name(f):
     seg = f.split('_')
     sensor = seg[1][:-6]
@@ -122,5 +122,17 @@ for sensor in sensorlist:
             candidacy.append(result_line.split(";"))
         #sorted(candidacy)
 
-        channel_date_list = classify_data(candidacy)
-        download_data(channel_date_list)
+        camera = {}
+        for cand in candidacy:
+            name = candidacy[1]
+            sensor, _, _ = cut_file_name(name)
+            camera_number = sensor[-1]
+
+            if camera_number in camera == False:
+                camera[camera_number] = []
+            camera[camera_number].append(cand)
+
+        camera_key = list(camera.keys())
+        for ck in camera_key:
+            channel_date_list = classify_data(camera[ck])
+            download_data(channel_date_list)
