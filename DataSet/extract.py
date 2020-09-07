@@ -459,6 +459,7 @@ class HurricaneExtractionRadM(HurricaneExtraction):
 
                 hur_extraction_data = {}
                 ex_angle = []
+                hur_name = ""
                 for dl in data_list:
                     g16nc = Dataset(dl[1])
 
@@ -470,7 +471,7 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                         x_image_bound = np.asarray(g16nc.variables['x_image_bounds'][:])
 
                         y_image_value = g16nc.variables['y_image_bounds'][0]
-                        x_image_value = g16nc.variables['x_image_bounds'][:]
+                        x_image_value = g16nc.variables['x_image_bounds'][0]
                         lati, longi = GOES.navigating_from_elevation_scanning_angle_to_geodetic(y_image_value, x_image_value, nadir)
                         vl = VisibleLight(date=time, latitude=lati, longitude=longi)
                         visibility = vl.isVisibility()

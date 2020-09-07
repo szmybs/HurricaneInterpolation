@@ -173,7 +173,7 @@ class GOES_netCDF(object):
         if hasattr(self, 'date') == False:
             self.date = goes_file_name_seperation(file_name)[-1]
         else:
-            if self.date != goes_file_name_seperation(file_name)[-1]
+            if self.date != goes_file_name_seperation(file_name)[-1]:
                 return False
         return True
 
@@ -186,6 +186,8 @@ class GOES_netCDF(object):
 
 
 if __name__ == "__main__":
+    pass
+
     # y = [0.095340, 0.095340, 0.095340]
     # x = [-0.024052, -0.024052, -0.024052, -0.024052, -0.024052]
     # y = [1, 2, 3]
