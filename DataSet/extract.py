@@ -466,16 +466,105 @@ class HurricaneExtraction(object):
 
 
 
+class HurricaneExtractionRadM(HurricaneExtraction):
+    def hurricane_extraction(self, section=None):
+
+        def get_elevation_scanning_angle(lamb0):
+            es_angle = []
+            for hl in hur_loc:
+                if len(hl) <= 0:
+                    continue
+                tmp = self.navigating_from_geodetic_to_elevation_scanning_angle(hl['Location'][0], hl['Location'][1], lamb0)
+                es_angle.append({'Location': tmp, 'Name': hl['Name']})
+            return es_angle
+
+        def judge_visibility():
+            visibility = {}
+            for hl in hur_loc:
+                if len(hl) <= 0:
+                    continue
+                vl = VisibleLight(date=time, latitude=hl['Location'][0], longitude=hl['Location'][1])
+                visibility[hl['Name']] = vl.isVisibility()
+            return visibility
+
+        while True:
+            try:
+                data_list = next(self.hur_url)
+                if len(data_list) <= 0:
+                    continue
+
+                time = data_list[0][0]
+                hur_loc = self.best_track.find_hurricane_location(time)
+                visibility = judge_visibility()
+
+                hur_extraction_data = {}
+                ex_angle = []
+                hur_name = ""
+                for dl in data_list:
+                    g16nc = Dataset(dl[1])
+
+                    if len(ex_angle) <= 0:
+                        ex_angle = get_elevation_scanning_angle(g16nc.variables['geospatial_lat_lon_extent'].geospatial_lon_nadir)
+                        y_image_bound = np.asarray(g16nc.variables['y_image_bounds'][:])
+                        x_image_bound = np.asarray(g16nc.variables['x_image_bounds'][:])
+
+                        size = np.asarray ( (g16nc.variables['y'].size, g16nc.variables['x'].size) )
+                        min_distance = np.sum(size)
+
+                        for ex in ex_angle:
+                            ex_loc = ex['Location']
+                            ex_name = ex['Name']
+
+                            hur_center = np.asarray(ex_loc)
+                        
+                            y_eye_grid = ((hur_center[0] - y_image_bound[0]) / (y_image_bound[1] - y_image_bound[0])) * size[0]
+                            x_eye_grid = ((hur_center[1] - x_image_bound[0]) / (x_image_bound[1] - x_image_bound[0])) * size[1]
+                            eye_grid = np.asarray( (y_eye_grid, x_eye_grid), dtype=np.int32)
+                            
+                            dist = np.sum(np.abs(np.subtract(eye_grid, size/2)))
+                            if dist < min_distance:
+                                min_distance = dist
+                                hur_name = ex_name
+                        if min_distance > np.sum(size/8):
+                            g16nc.close()
+                            print("这不是一个台风: %s - %d" % (time, min_distance))
+                            break
+
+                    rad = g16nc.variables['Rad'][:]
+                    rad = np.ma.fix_invalid(rad, fill_value=rad.min)
+
+                    if hur_name in hur_extraction_data:
+                        hur_extraction_data[hur_name].append(rad)
+                    else:
+                        hur_extraction_data[hur_name] = []
+                        hur_extraction_data[hur_name].append(rad)
+                        #print('A')
+                    g16nc.close()
+                self.save_extraction_data(hur_extraction_data, time, visibility)
+            
+            except StopIteration:
+                break
+            except OSError:
+                print('有文件出错啦:%s' % str(dl[1]))
+                continue
+
+
 if __name__ == "__main__":
     # tfc = time_format_convert('20202180622', to_julian=False)
     # vl = VisibleLight(date='20202180019', latitude=39.1068, longitude=-94.566)
     # vli = vl.isVisibility()
 
-    hur_data_path = './Data/ABI-L1b-RadC/'
-    best_track_file = './Data/best-track/2017-4hurricane-best-track.txt'
+    # hur_data_path = './Data/ABI-L1b-RadC/'
+    # best_track_file = './Data/best-track/2017-4hurricane-best-track.txt'
 
-    he = HurricaneExtraction(hur_data_path, best_track_file, './Data/NpyData/', select_date=None)
-    he.hurricane_extraction(section=(256, 256))
+    # he = HurricaneExtraction(hur_data_path, best_track_file, './Data/NpyData/', select_date=None)
+    # he.hurricane_extraction(section=(256, 256))
 
     # jd = time_format_convert('20170910')  #253
     # print(jd[0])
+
+    hur_data_path = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1\\ABI-L1b-RadM1\\'
+    best_track_file = 'D:\\Code\GOES-R-2017-HurricaneExtraction\\Data\\best-track\\2017-4hurricane-best-track.txt'
+
+    he = HurricaneExtractionRadM(hur_data_path, best_track_file, 'D:\\Code\GOES-R-2017-HurricaneExtraction\\Data\\RadM-Npy\\', select_date=None)
+    he.hurricane_extraction()

@@ -10,17 +10,26 @@ from Modeling.zenith_azimuth import solar_satellite_zenith_azimuth_angle
 
 
 class HurricaneModel(object):
-    def __init__(self, files_name):
+    def __init__(self, files_name, **kwargs):
         if isinstance(files_name, list):
-            self.rad = GOES_netCDF(files_name)
+            self.g16nc = GOES_netCDF(files_name)
         else:
-            self.rad = np.load(files_name)
+            rad = np.load(files_name)
+            head, date = kwargs['Head'], kwargs['Date']
+            self.g16nc = GOES_netCDF(Rad=rad, Head=head, Date=date)
 
-        self.temperature = self.conversion_radiances_to_brightness_temperature(self.rad[1:])
+        # Band 7 ~ 16 : 7,9,14,15
+        self.temperature = self.conversion_radiances_to_brightness_temperature(self.g16nc.Rad[1:])
+        self.convsersion_bands_nums()
+
+        self.solar_zenith_angle, self.solar_azimuth_angle, self.satellite_zenith_angle, self.satellite_azimuth_angle = solar_satellite_zenith_azimuth_angle(self.g16nc)
+        # Band 1 ~ 6 : only 1
+        self.refVIS = self.conversion_radiances_to_reflectance(self.g16nc.Rad[:1], self.g16nc.data_head.kappa0, self.solar_zenith_angle)
 
 
+    # 无云:0  水云:1  冰云:2  卷云:3
     def cloud_classification(self):
-
+        ice_cloud 
 
 
     @classmethod
@@ -51,8 +60,15 @@ class HurricaneModel(object):
         return np.divide( (rad * kappa0), np.cos(solar_zenith_angle) )
 
 
-    @classmethod
-    def convsersion_bands_nums(self, rad):
+    def convsersion_bands_nums(self):
         # VIS-M3C01  IR1-M3C14  IR2-M3C15  WV-M3C09  MWIR-M3C07
         # M3C01-VIS  M3C07-MWIR  M3C09-WV  M3C14-IR1  M3C15-IR2
+        self.tempIR1 = self.temperature[-2]
+        self.tempIR2 = self.temperature[-1]
+        self.tempWV = self.temperature[-3]
+        self.tempMWIR = self.temperature[-4]
         pass
+
+
+if __name__ == "__main__":
+    pass

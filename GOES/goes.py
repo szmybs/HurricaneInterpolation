@@ -2,10 +2,29 @@ from netCDF4 import Dataset
 import numpy as np
 import os
 import math
+import datetime
 
 import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
+
+from GOES.time_format import convert_julian_to_datetime 
+
+
+#OR_ABI-L1b-RadC-M3C01_G16_s20172500027163_e20172500029536_c20172500029578.nc
+#OR_ABI-L1b-RadM1-M3C01_G16_s20172500027163_e20172500029536_c20172500029578.nc
+def goes_file_name_seperation(file_name):
+    seg = file_name.split('_')
+
+    sensor = seg[1][:12]
+    channel = seg[1][-5:]
+
+    year = seg[3][1:5]
+    jd = seg[3][5:8]
+    hour = seg[3][8:10]
+    minute = seg[3][10:12]
+    return (sensor, channel, year, jd, hour, minute, convert_julian_to_datetime(year+jd+hour+minute))
+
 
 
 class GOES(object):
@@ -118,27 +137,44 @@ class netCDF_Head(object):
 
 
 class GOES_netCDF(object):
-    def __init__(self, file_names):
-        self.Rad = []
-        for fn in file_names:
-            g16nc = Dataset(fn)
-            self.Rad.append(g16nc.variables['Rad'][:])
-            flag = self._get_data_head(g16nc)
+    def __init__(self, file_names, **kwargs):
+        if 'Rad' in kwargs and 'Date' in kwargs and 'Head' in kwargs:
+            self.Rad = kwargs['Rad']
+            self.date = kwargs['Date']
+            self.data_head = kwargs['Head']
+        else:
+            self.Rad = []
+            for fn in file_names:
+                g16nc = Dataset(fn)
+                self.Rad.append(g16nc.variables['Rad'][:])
 
-            g16nc.close()
+                flagD = self._get_data_head(g16nc)
+                flagT = self._get_datetime(fn)
 
-            if flag == False:
-                self.Rad.clear()
-                delattr(self, 'data_head')
-                print("数据一致性检验错误")
-                break
-        self.Rad = np.ndarray(self.Rad)
+                g16nc.close()
+
+                if flagD == False or flagT == False:
+                    self.Rad.clear()
+                    delattr(self, 'data_head')
+                    delattr(self, 'date')
+                    print("数据一致性检验错误")
+                    break
+            self.Rad = np.ndarray(self.Rad)
+
 
     def _get_data_head(self, g16nc):
         if hasattr(self, 'data_head') == False:
             self.data_head = netCDF_Head(g16nc)
         else:
             return self.data_head.check(g16nc)
+        return True
+    
+    def _get_datetime(self, file_name):
+        if hasattr(self, 'date') == False:
+            self.date = goes_file_name_seperation(file_name)[-1]
+        else:
+            if self.date != goes_file_name_seperation(file_name)[-1]
+                return False
         return True
 
     def add_longitude_table(self, longitude_table):
@@ -150,11 +186,15 @@ class GOES_netCDF(object):
 
 
 if __name__ == "__main__":
-    y = [0.095340, 0.095340, 0.095340]
-    x = [-0.024052, -0.024052, -0.024052, -0.024052, -0.024052]
-
+    # y = [0.095340, 0.095340, 0.095340]
+    # x = [-0.024052, -0.024052, -0.024052, -0.024052, -0.024052]
     # y = [1, 2, 3]
     # x = [4, 5, 6, 7, 8]
     #tmp = GOES.navigating_from_elevation_scanning_angle_to_geodetic(0.095340, -0.024052, -1.308996939)   
     #tmp2 = GOES.navigating_from_elevation_scanning_angle_to_geodetic2(np.asarray(y), np.asarray(x), -1.308996939)
     # GOES.compute_latitued_longitued_per_ABI_grid(np.asarray(y), np.asarray(x), -1.308996939)
+
+    # file_name = "OR_ABI-L1b-RadC-M3C01_G16_s20172500027163_e20172500029536_c20172500029578.nc"
+    # #file_name = "OR_ABI-L1b-RadM1-M3C01_G16_s20172500027163_e20172500029536_c20172500029578.nc"
+    # goes_file_name_seperation(file_name)
+

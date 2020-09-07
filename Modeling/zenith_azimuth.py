@@ -7,24 +7,28 @@ if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
 from GOES.goes import GOES, GOES_netCDF
+from GOES.time_format import convert_datetime_to_julian
 
 
-def solar_satellite_zenith_azimuth_angle(g16nc, julian_day, utc_hour):
+# g16nc 是一个 GOES_netCDF类的实例
+def solar_satellite_zenith_azimuth_angle(g16nc):
 
     if hasattr(g16nc, 'longitude_table') == False or hasattr(g16nc, 'latitude_table') == False:
-        latitude_table, longitude_table = GOES.compute_latitude_longitude_table(g16nc.y, g16nc.x, g16nc.geospatial_lon_nadir)
-        g16nc.add_latitude_table(latitude_table)
-        g16nc.add_longitude_table(longitude_table)
-    
-    #输入日期格式问题！
-    JD = julian_day
-    utc_hour = utc_hour
+        latt, lont = GOES.compute_latitude_longitude_table(g16nc.data_head.y, g16nc.data_head.x, g16nc.data_head.geospatial_lon_nadir)
+        g16nc.add_latitude_table(latt)
+        g16nc.add_longitude_table(lont)
+
+
+    data_date = convert_datetime_to_julian(g16nc.date)
+    JD = data_date[1]
+    utc_hour = data_date[2]
+    minutes = data_date[3]
 
     delta = -23.45 * math.cos( (2*math.pi*(JD+10)) / 365 )
 
     beta = 2*math.pi * (JD-81) / 365
     Xtime = 9.87*math.sin(2*beta) - 7.53*math.cos(beta) - 1.5*math.sin(beta)
-    l = utc_hour + g16nc.longitude_table/15 + Xtime/60
+    l = utc_hour + minutes/60 + g16nc.longitude_table/15 + Xtime/60
     Ha = 15*(l-12)
 
     delta = np.deg2rad(delta)
@@ -59,7 +63,7 @@ def solar_satellite_zenith_azimuth_angle(g16nc, julian_day, utc_hour):
     satellite_dis = 35786
     dv = radius + satellite_dis
 
-    longitude_dif = np.deg2rad(longitude_table) - np.deg2rad(g16nc.geospatial_lon_nadir)
+    longitude_dif = np.deg2rad(g16nc.longitude_table) - np.deg2rad(g16nc.geospatial_lon_nadir)
     center_angle = np.arccos( np.multiply( coslat, np.cos(longitude_dif) ) )
 
     satellite_azimuth_angle = np.divide( np.sin(longitude_dif), np.sin(center_angle) )
@@ -126,11 +130,11 @@ def solar_satellite_zenith_azimuth_angle(g16nc, julian_day, utc_hour):
 
 if __name__ == "__main__":
 
-    path = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ABI-L1b-RadC\\M3C01\\2017253\\'
-    name = 'OR_ABI-L1b-RadC-M3C01_G16_s20172531622165_e20172531624538_c20172531624581.nc'
+    # path = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ABI-L1b-RadC\\M3C01\\2017253\\'
+    # name = 'OR_ABI-L1b-RadC-M3C01_G16_s20172531622165_e20172531624538_c20172531624581.nc'
 
-    g16nc = GOES_netCDF(os.path.join(path, name))
-    solar_satellite_zenith_azimuth_angle(g16nc, 253, 16)
+    # g16nc = GOES_netCDF(os.path.join(path, name))
+    # solar_satellite_zenith_azimuth_angle(g16nc, 253, 16)
 
     # zero = np.ones(shape=(3,1))
     # one = np.ones(shape=(3,5))
