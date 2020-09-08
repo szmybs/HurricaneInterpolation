@@ -14,6 +14,7 @@ from GOES.goes import GOES
 
 GOES_CHANNELS = ('M3C01', 'M3C07', 'M3C09', 'M3C14', 'M3C15')
 
+no_hur_count = 0
 
 def time_format_convert(date, to_julian=True):
     if type(date) != 'str':
@@ -212,16 +213,16 @@ class PathSet(object):
                 files = sorted(os.listdir(d))
                 files_dict = {}
                 for f in files:
-                    time = self.cut_filename(f)
-                    files_dict[time] = os.path.join(d, f)
+                    sensor, time = self.cut_filename(f)
+                    files_dict[(time, sensor)] = os.path.join(d, f)
                 files_tree.append(files_dict)
-            
+
             ref = list(files_tree[0])
-            for time in ref:
+            for KEY in ref:
                 files_path = []
                 for files_dict in files_tree:
-                    if time in files_dict:
-                        files_path.append([time, files_dict[time]])
+                    if KEY in files_dict:
+                        files_path.append([KEY[0], files_dict[KEY]])
                     else:
                         files_path.clear()
                         break
@@ -238,8 +239,9 @@ class PathSet(object):
             
     def cut_filename(self, f):
         seg = f.split('_')
+        sensor = seg[1][:-6]
         time = seg[3][1:12]
-        return time
+        return sensor, time
 
 
 class VisibleLight(object):
@@ -494,13 +496,15 @@ class HurricaneExtractionRadM(HurricaneExtraction):
                             x_eye_grid = ((hur_center[1] - x_image_bound[0]) / (x_image_bound[1] - x_image_bound[0])) * size[1]
                             eye_grid = np.asarray( (y_eye_grid, x_eye_grid), dtype=np.int32)
                             
-                            dist = np.sum(np.abs(np.subtract(eye_grid, size/2)))
+                            dist = np.sum(np.abs(np.subtract(eye_grid, size)))
                             if dist < min_distance:
                                 min_distance = dist
                                 hur_name = ex_name
-                        if min_distance > np.sum(size/4):
+                        if min_distance > 1800:
                             g16nc.close()
                             print("这不是一个台风: %s - %d" % (time, min_distance))
+                            global no_hur_count 
+                            no_hur_count += 1
                             break
 
                     rad = g16nc.variables['Rad'][:]
@@ -541,3 +545,5 @@ if __name__ == "__main__":
 
     he = HurricaneExtractionRadM(hur_data_path, best_track_file, './DataSet/Data-RadM/', select_date=None)
     he.hurricane_extraction()
+
+    print(no_hur_count)
