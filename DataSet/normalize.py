@@ -7,7 +7,8 @@ if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
 from DataSet.quantization import Quantization
-from DataSet.hurricane_generator import HurricaneGenerator
+# from DataSet.hurricane_generator import HurricaneGenerator
+from DataSet import hurricane_generator as G
 
 
 class Normalize(object):
@@ -68,15 +69,17 @@ class Normalize(object):
             unnorm_data = np.add( np.multiply(data, np.subtract(max_range, min_range)), min_range )
             return unnorm_data
 
+    def _get_files(self):
+        lds = G.HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
+        files = []
+        for ld in lds:
+            f = glob.glob(pathname=os.path.join(ld, '*.npy'))
+            files = files + f
+        return files
 
     def normalize_using_std_gaussian(self, data):
         if os.path.exists(self.gaussian_path) == False:
-            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
-            files = []
-            for ld in lds:
-                f = glob.glob(pathname=os.path.join(ld, '*.npy'))
-                files = files + f
-            
+            files = self._get_files()            
             means = []
             for fi in files:
                 fptr = np.load(fi)
@@ -89,6 +92,7 @@ class Normalize(object):
             for fi in files:
                 fptr = np.load(fi)
                 fptr = Quantization.convert_unsigned_to_float(fptr)
+                fptr = self.normalize_using_physics(fptr)
                 subm = np.subtract(fptr, means)
                 mult = np.multiply(subm, subm)
                 var.append( np.mean(mult, axis=(0, 1)) )
@@ -118,16 +122,12 @@ class Normalize(object):
 
     def normalize_using_max_min(self, data, mode=0):
         if os.path.exists(self.max_min_path) == False:
-            lds = HurricaneGenerator.leaf_directory_generator(self.data_path, wbl=[{}, {'white_list':['Visible']}, {}])
-            files = []
-            for ld in lds:
-                f = glob.glob(pathname=os.path.join(ld, '*.npy'))
-                files = files + f
-            
+            files = self._get_files()      
             MAX, MIN = [], []
             for fi in files:
                 fptr = np.load(fi)
                 fptr = Quantization.convert_unsigned_to_float(fptr)
+                fptr = self.normalize_using_physics(fptr)
                 MAX.append( np.amax(fptr, axis=(0, 1)) )
                 MIN.append( np.amin(fptr, axis=(0, 1)) )
             MAX = np.array(MAX)
@@ -150,8 +150,8 @@ class Normalize(object):
         try:
             if hasattr(self, 'max') == False or hasattr(self, 'min') == False:
                 dptr = np.load(self.max_min_path)
-                self.mean = dptr['max']
-                self.std = dptr['min']
+                self.max = dptr['max']
+                self.min = dptr['min']
             if mode == 0:
                 return np.add( np.multiply(data, np.subtract(self.max, self.min)), self.min )
             return np.add( np.multiply( (data + 1),  np.subtract(self.max, self.min)/2 ), self.min )
@@ -161,10 +161,4 @@ class Normalize(object):
 
 
 if __name__ == "__main__":
-    data_path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ScaledData32\\"
-    norm = Normalize(data_path)
-
-    data = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ScaledData32\\IRMA\\Visible\\2017253\\20172531622.npy"
-    data = np.load(data)
-
-    norm.normalize_using_max_min(data, path=".\\DataSet\\max_min.npz")
+    pass

@@ -7,6 +7,8 @@ if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
 from DataSet.quantization import Quantization
+# from DataSet.normalize import Normalize
+from DataSet import normalize as N
 
 # .\\IRMA\\Visible\\2017253
 class HurricaneGenerator(object):
@@ -83,10 +85,18 @@ class HurricaneGenerator(object):
                 x.clear()
 
 
+# 还是在这里进行physics标准化. 不然总要加上这句太烦了
+def hurricane_load(file_path):
+    data = np.load(file_path)
+    data = Quantization.convert_unsigned_to_float(data)
+    # data = Normalize.normalize_using_physics(data)
+    data = N.Normalize.normalize_using_physics(data)
+    return data
+
 
 def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_size=1, wbl=[{}, {}, {}]):
     def read_npy_hurricane_data(file_path):
-        return np.load(file_path)
+        return hurricane_load(file_path)
 
     if read_data_func is None:
         read_data_func = read_npy_hurricane_data
@@ -100,12 +110,9 @@ def name_visibility_date_dir_generator(root_path, read_data_func=None, batch_siz
             while True:
                 try:
                     hdg = next(odg)
-                    hdg = Quantization.convert_unsigned_to_float(hdg)      # 这里转化为浮点数
-                    #hdg = HurricaneExtraction.normalize_using_physics(hdg)
                     yield(hdg)
                 except StopIteration:
                     break
-
 
 
 def name_visibility_date_dir_data_counts(root_path, black_list=None):
@@ -139,10 +146,9 @@ def name_visibility_date_dir_data_counts(root_path, black_list=None):
     return count
 
 
-
 def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch_size=1, length=3, wbl=[{}, {}, {}]):
     def read_npy_hurricane_data(file_path):
-        return np.load(file_path)
+        return hurricane_load(file_path)
 
     if read_data_func is None:
         read_data_func = read_npy_hurricane_data
@@ -159,13 +165,14 @@ def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch
                 try:
                     while len(seq) < length:
                         hdg = next(odg)
-                        hdg = Quantization.convert_unsigned_to_float(hdg)
                         seq.append(hdg)
 
                     yield(seq)
                     seq.clear()
                 except StopIteration:
                     break
+
+
 
 
 if __name__ == "__main__":

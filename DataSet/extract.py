@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
 from DataSet.sunrise_sunset import SunriseSunset
 from DataSet.normalize import Normalize, Quantization
-from GOES.goes import GOES
+from GOES.goes_calculation import GOES
 
 GOES_CHANNELS = ('M3C01', 'M3C07', 'M3C09', 'M3C14', 'M3C15')
 
@@ -238,6 +238,7 @@ class PathSet(object):
             
     def cut_filename(self, f):
         seg = f.split('_')
+        sensor = seg[1][:-6]
         time = seg[3][1:12]
         return time
 

@@ -6,6 +6,14 @@ import sys
 
 from PIL import Image
 
+import tensorflow as tf
+import keras.backend.tensorflow_backend as KTF
+
+config = tf.ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.8
+session = tf.Session(config=config)
+KTF.set_session(session)
+
 from keras import backend as K
 from keras.layers import Conv2D, Activation, Input, Lambda
 from keras.models import Model
@@ -21,6 +29,10 @@ from DataSet.hurricane_generator import name_visibility_date_dir_generator, name
 from DataSet.extract import HurricaneExtraction
 from DataSet.normalize import Normalize, Quantization
 from GlowKeras.data_augmentation import rotation90, vertical_flip, mirror_flip
+
+
+gaussian_norm_path = "./DataSet/norm_factor/gaussian.npz"
+max_min_norm_path = "./DataSet/norm_factor/max_min.npz"
 
 
 class Evaluate(Callback):
@@ -44,20 +56,27 @@ class Evaluate(Callback):
             K.set_value(self.model.optimizer.lr, K.get_value(self.model.optimizer.lr) * 0.1)
 
 
-
+# 默认参数训练的模型为Model-base
 class Glow(object):
-    def __init__(self):
-        self.batch_size = 8
-        self.learning_rate = 1e-4
+    def __init__(self, batch_size=8, 
+                                    lr=1e-4, 
+                                    level=3, 
+                                    depth=8, 
+                                    vd='LIDIA', 
+                                    data_shape=(256,256,5), 
+                                    dam=[rotation90, vertical_flip, mirror_flip]
+    ):
+        self.batch_size = batch_size
+        self.learning_rate = lr
 
-        self.level = 3
-        self.depth = 8
+        self.level = level
+        self.depth = depth
 
-        self.validate_seperation = 'LIDIA'
+        self.validate_seperation = vd
 
-        self.data_shape = (256, 256, 5)
+        self.data_shape = data_shape
 
-        self.dam = [rotation90, vertical_flip, mirror_flip]
+        self.dam = dam
 
 
     def build_basic_model(self, in_channel):
@@ -107,7 +126,7 @@ class Glow(object):
                 actnorm = Actnorm()
                 permute = Permute(mode='random')
                 split = Split()
-                couple = CoupleWrapper(self.build_basic_model(5*2**(i+1))) 
+                couple = CoupleWrapper(self.build_basic_model(self.data_shape[-1]*2**(i+1))) 
                 concat = Concat()
                 inner_layers[0].append(actnorm)
                 inner_layers[1].append(permute)
@@ -143,6 +162,9 @@ class Glow(object):
         x = final_reshape(x)
         x = final_concat(x_outs+[x])
 
+        # 加一个sigmoid试试伪装成截断分布
+        # x = Lambda( lambda y: 2*K.sigmoid(y)-1 )(x)
+
         self.encoder = Model(x_in, x)
         for l in self.encoder.layers:
             if hasattr(l, 'logdet'):
@@ -154,6 +176,10 @@ class Glow(object):
         # decoder part
         x_in = Input(shape=K.int_shape(self.encoder.outputs[0])[1:])
         x = x_in
+
+        # 从伪装的截断分布恢复
+        # 该函数的导数 (1-y) / (1+y) 会出现nan的爆炸
+        # x = Lambda( lambda y: K.log( (1+y) / (1-y) ) )(x)
 
         x = final_concat.inverse()(x)
         outputs = x[:-1]
@@ -182,7 +208,7 @@ class Glow(object):
         self.decoder.summary()
 
 
-    def nparray_to_image(self, x):
+    def nparray_to_image(self, x, save_path):
         height, width, channel = self.data_shape
 
         figure = np.zeros( (height * len(x), width * channel, 1) )
@@ -192,8 +218,18 @@ class Glow(object):
                 figure[i*height : (i+1)*height, j*width : (j+1)*width] = x[i][..., j : (j+1)]
         
         figure = np.squeeze(figure)
+
+        figure = np.clip(figure * 255, 0, 255).astype('uint8')      # 将0-1变为0-255，似乎很多软件只能打开0-255式的
         img = Image.fromarray(figure)
-        return img
+
+        # img = Image.fromarray(figure)
+
+        postfix = os.path.splitext(save_path)[1]
+        if postfix.upper() == '.JPG' or postfix.upper() == '.PNG':
+            img = img.convert("RGB")
+        
+        # img.show()
+        img .save(save_path)
 
 
     def sample(self, save_path, epoch, n=9, std=0.9):
@@ -206,12 +242,10 @@ class Glow(object):
             digit = x_decoded[0].reshape(self.data_shape)
             digit = self.hurricane_undo_normalize(digit)   # 在这里需要一个undo_normalize
             x.append(digit)
+        save_name = str(epoch) + "_sampled" + ".jpg"
+        self.nparray_to_image(x, os.path.join(save_path, save_name))
 
-        img = self.nparray_to_image(x)
-        save_name = str(epoch) + "_sampled" + ".tiff"
-        img.save(os.path.join(save_path, save_name))
-
-
+    # 没什么用
     def reconstrut(self, data_root_path, save_path, epoch):
         x = []
 
@@ -222,9 +256,8 @@ class Glow(object):
             re = self.decoder.predict(lv)
             re = self.hurricane_undo_normalize(re)   # 在这里需要一个undo_normalize
             x.append(re)
-        img = self.nparray_to_image(x)
-        save_name = str(epoch) + ".tiff"
-        img.save(os.path.join(save_path, save_name))
+        save_name = str(epoch) + ".jpg"
+        self.nparray_to_image(x, os.path.join(save_path, save_name))
 
 
     # 在 hurrica_generator.py中浮点化和正则化
@@ -262,9 +295,7 @@ class Glow(object):
         
         self.normalize = Normalize(data_path=data_root_path, gaussian_path=gaussian_path, max_min_path=max_min_path)
 
-        self.norm_list = [self.normalize.normalize_using_physics,
-                        self.normalize.normalize_using_max_min]
-
+        self.norm_list = [self.normalize.normalize_using_max_min]
         self.undo_norm_list = [self.normalize.undo_normalize_using_max_min]
 
     def hurricane_normalize(self, data):
@@ -291,7 +322,7 @@ class Glow(object):
         self.build_model(self.data_shape)
         self.compile()
 
-        self.create_norm_list(data_root_path, "./DataSet/norm_factor/gaussian.npz", "./DataSet/norm_factor/max_min.npz")
+        self.create_norm_list(data_root_path, gaussian_norm_path, max_min_norm_path)
 
         # generator
         train_data_generator = self.glow_generator(data_root_path)
@@ -344,8 +375,16 @@ class Glow(object):
         self.encoder.load_weights(weights_path)
 
 
+# 没什么用
+def test_glow_factory():
+    glow = Glow()
+    glow.load_weights("./GlowKeras/Model/best_encoder.weights")
+    glow.create_norm_list(None, gaussian_norm_path, max_min_norm_path)
+    return glow
+
+
 if __name__ == "__main__":
-    data_root_path = "./DataSet/ScaledData256/"
+    data_root_path = "./DataSet/ScaledData256-RadM/"
     save_model_path = "./GlowKeras/Model/"
     sample_root_path = "./GlowKeras/Sample/"
 
@@ -355,7 +394,7 @@ if __name__ == "__main__":
         os.mkdir(sample_root_path)
 
     glow = Glow()
-    glow.train(150, drp=data_root_path, smp=save_model_path, srp=sample_root_path)
+    glow.train(30, drp=data_root_path, smp=save_model_path, srp=sample_root_path)
 
     # gg = glow.glow_generator(data_root_path)
     # for i in range(10):

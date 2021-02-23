@@ -24,7 +24,7 @@ class Quantization(object):
             sf = np.array(scale_factor)
             ao = np.array(add_offset)
 
-            unsigned_data = np.divide( np.subtract(float_data - ao), sf )
+            unsigned_data = np.divide( np.subtract(float_data, ao), sf )
             unsigned_data = (np.around(unsigned_data, 0)).astype(np.uint16)
             return unsigned_data 
 

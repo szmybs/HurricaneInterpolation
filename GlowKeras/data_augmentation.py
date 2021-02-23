@@ -43,6 +43,7 @@ def rotation(data, k=1):
         return np.rot90(data, k=k, axes=(1, 2)) 
 
 
+
 def rotation90(data):
     return rotation(data, k=1)
 

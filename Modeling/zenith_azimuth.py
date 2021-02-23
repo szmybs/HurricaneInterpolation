@@ -6,7 +6,8 @@ import sys
 if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
-from GOES.goes import GOES, GOES_netCDF
+from GOES.goes_calculation import GOES
+from GOES.goes import GOES_netCDF
 from GOES.time_format import convert_datetime_to_julian
 
 
@@ -20,9 +21,9 @@ def solar_satellite_zenith_azimuth_angle(g16nc):
 
 
     data_date = convert_datetime_to_julian(g16nc.date)
-    JD = data_date[1]
-    utc_hour = data_date[2]
-    minutes = data_date[3]
+    JD = int(data_date[1])
+    utc_hour = int(data_date[2])
+    minutes = int(data_date[3])
 
     delta = -23.45 * math.cos( (2*math.pi*(JD+10)) / 365 )
 
@@ -129,7 +130,7 @@ def solar_satellite_zenith_azimuth_angle(g16nc):
 
 
 if __name__ == "__main__":
-
+    pass
     # path = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\ABI-L1b-RadC\\M3C01\\2017253\\'
     # name = 'OR_ABI-L1b-RadC-M3C01_G16_s20172531622165_e20172531624538_c20172531624581.nc'
 
@@ -140,6 +141,6 @@ if __name__ == "__main__":
     # one = np.ones(shape=(3,5))
     # print(zero + one)
 
-    # today = datetime.date(2020, 8, 26)
-    # today = today.strftime(("%j"))
-    # print(today)
+    today = datetime.date(2020, 8, 26)
+    today = today.strftime(("%j"))
+    print(type(today))

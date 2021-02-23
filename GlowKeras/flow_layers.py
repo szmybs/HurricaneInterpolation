@@ -311,6 +311,7 @@ class CondActnorm(Layer):
         else:
             logdet = -K.sum(K.mean(log_scale, 0))
             x_outs = K.exp(log_scale) * x1 + shift
+            # x_outs = log_scale * x1 + shift
         self.logdet = logdet
         return x_outs
     def inverse(self):
