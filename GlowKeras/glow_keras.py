@@ -58,13 +58,14 @@ class Evaluate(Callback):
 
 # 默认参数训练的模型为Model-base
 class Glow(object):
-    def __init__(self, batch_size=8, 
-                                    lr=1e-4, 
-                                    level=3, 
-                                    depth=8, 
-                                    vd='LIDIA', 
-                                    data_shape=(256,256,5), 
-                                    dam=[rotation90, vertical_flip, mirror_flip]
+    def __init__(self, 
+                batch_size=8, 
+                lr=1e-4, 
+                level=3, 
+                depth=8, 
+                vd='LIDIA', 
+                data_shape=(256,256,5), 
+                dam=[rotation90, vertical_flip, mirror_flip]
     ):
         self.batch_size = batch_size
         self.learning_rate = lr
@@ -229,7 +230,7 @@ class Glow(object):
             img = img.convert("RGB")
         
         # img.show()
-        img .save(save_path)
+        img.save(save_path)
 
 
     def sample(self, save_path, epoch, n=9, std=0.9):
@@ -260,7 +261,7 @@ class Glow(object):
         self.nparray_to_image(x, os.path.join(save_path, save_name))
 
 
-    # 在 hurrica_generator.py中浮点化和正则化
+    # 在 hurrica_generator.py中浮点化
     def glow_generator(self, data_root_path, mode = 'train'):
         if mode == 'train':
             gg = name_visibility_date_dir_generator(root_path=data_root_path, 
