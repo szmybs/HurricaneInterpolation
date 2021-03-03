@@ -146,6 +146,7 @@ def name_visibility_date_dir_data_counts(root_path, black_list=None):
     return count
 
 
+# 在batch_size 不等于 1 的情况下存在问题
 def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch_size=1, length=3, wbl=[{}, {}, {}]):
     def read_npy_hurricane_data(file_path):
         return hurricane_load(file_path)
@@ -172,6 +173,38 @@ def name_visibility_date_dir_seq_generator(root_path, read_data_func=None, batch
                 except StopIteration:
                     break
 
+
+def name_visibility_date_dir_seq_generator_V2(root_path, read_data_func=None, batch_size=1, length=3, wbl=[{}, {}, {}]):
+    def read_npy_hurricane_data(file_path):
+        return hurricane_load(file_path)
+
+    if read_data_func is None:
+        read_data_func = read_npy_hurricane_data
+    
+    leaf_directory = HurricaneGenerator.leaf_directory_generator(root_path=root_path, mode='sort', wbl=wbl)
+
+    while True:
+        random.shuffle(leaf_directory)
+        for ld in leaf_directory:
+            # odg = HurricaneGenerator.one_dircetory_generator(data_path=ld, batch_size=batch_size, mode='sort', read_data_func=read_data_func)
+
+            necessity_size = (batch_size - 1) + length
+            odg = HurricaneGenerator.one_dircetory_generator(data_path=ld, batch_size=necessity_size, mode='sort', read_data_func=read_data_func)     
+            seq = []
+            while True:
+                try:
+                    hdg = next(odg)
+                    
+                    # while len(seq) < batch_size:
+                    #     seq.append(hdg[len(seq):len(seq)+length])
+                    # yield(seq)
+                    while len(seq) < length:
+                        seq.append(hdg[len(seq):len(seq)+length])
+                    yield(seq)
+
+                    seq.clear()
+                except StopIteration:
+                    break
 
 
 

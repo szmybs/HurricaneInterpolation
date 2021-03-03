@@ -30,6 +30,7 @@ if __name__ == "__main__":
 from GlowKeras.glow_keras import Glow
 from DataSet.hurricane_generator import name_visibility_date_dir_seq_generator, name_visibility_date_dir_data_counts
 from GlowKeras.data_augmentation import rotation90, vertical_flip, mirror_flip
+from GlowKeras.data_augmentation import rotation90_in_list, vertical_flip_in_list, mirror_flip_in_list
 from DataSet.normalize import Normalize, Quantization
 
 
@@ -96,7 +97,8 @@ class InterpolationBase(object):
             outputs_img.append(x)
             outputs_vec.append(y)
 
-        return Model(inputs, [outputs_img, outputs_vec], name='interpolate_network')
+        outputs = outputs_img + outputs_vec 
+        return Model(inputs, outputs, name='interpolate_network')
 
 
     def train(self, epochs=1, sample_interval=5, **kwarg):
@@ -111,6 +113,7 @@ class InterpolationBase(object):
         steps_per_epoch, steps_per_validate = self.compute_step_per_epoch(train_data_path, validate_data_path)
 
         self.model = self.build_model()
+        self.model.summary(line_length=150)
         self.compile()
 
         try:
@@ -120,8 +123,12 @@ class InterpolationBase(object):
                     trainStartTime = time.time()
 
                     td = train_data_generator.__next__()
-
-                    loss = self.model.train_on_batch(x=td[0], y=td[1])
+                    
+                    ground_truth = td[1:]
+                    for i in td[1:]:
+                        vec = self.glow_model.predict(i, batch_size=self.batch_size)
+                        ground_truth.append(vec)
+                    loss = self.model.train_on_batch(x=td[0], y=ground_truth)
 
                     total_loss = total_loss + loss
                     mean_loss = total_loss / (step+1)
@@ -212,7 +219,7 @@ class HurricaneInterpolation(InterpolationBase):
                 glow_model = None, 
                 glow_inverse_model = None,
                 vd='LIDIA', 
-                dam=[rotation90, vertical_flip, mirror_flip]
+                dam=[rotation90_in_list, vertical_flip_in_list, mirror_flip_in_list]
     ):
         super(HurricaneInterpolation, self).__init__(batch_size, lr, data_shape, block_nums, glow_model, glow_inverse_model)
         self.validate_seperation = vd
@@ -264,16 +271,28 @@ class HurricaneInterpolation(InterpolationBase):
 
     def interpolate_normalize(self, data):
         if hasattr(self, 'norm_list') == False or len(self.norm_list) <= 0:
-            return data           
-        for norm in self.norm_list:
-            data = norm(data)
+            return data
+
+        if isinstance(data, list):
+            for d in data:
+                for norm in self.norm_list:
+                    d = norm(d)
+        else:  
+            for norm in self.norm_list:
+                data = norm(data)
         return data
 
     def interpolate_undo_normalize(self, data):
         if hasattr(self, 'undo_norm_list') == False or len(self.undo_norm_list) <= 0:
-            return data  
-        for unnorm in self.undo_norm_list:
-            data = unnorm(data)
+            return data 
+        
+        if isinstance(data, list):
+            for d in data:
+                for unnorm in self.undo_norm_list:
+                    data = unnorm(data)
+        else:
+            for unnorm in self.undo_norm_list:
+                data = unnorm(data)
         return data
     
 
@@ -296,3 +315,12 @@ class HurricaneInterpolation(InterpolationBase):
             img = img.convert("RGB")
         # img.show()
         img.save(save_path)
+    
+
+    def compute_step_per_epoch(self, tdp, vdp):
+        train_data_nums = name_visibility_date_dir_data_counts(tdp, black_list=[self.validate_seperation, 'Invisible'])
+        validate_data_nums = name_visibility_date_dir_data_counts(tdp, black_list=['Invisible']) - train_data_nums
+
+        steps_per_epoch = math.floor( train_data_nums / (self.batch_size - 1 + self.block_nums) ) * (len(self.dam) + 1)
+        steps_for_validate = math.floor( validate_data_nums / (self.batch_size - 1 + self.block_nums) )
+        return steps_per_epoch, steps_for_validate

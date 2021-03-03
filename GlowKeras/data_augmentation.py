@@ -55,6 +55,23 @@ def vertical_flip(data):
 
 
 
+def rotation90_in_list(data):
+    for d in data:
+        d = rotation90(d)
+    return data
+
+def mirror_flip_in_list(data):
+    for d in data:
+        d = mirror_flip(d)
+    return data
+
+def vertical_flip_in_list(data):
+    for d in data:
+        d = vertical_flip(d)
+    return data
+
+
+
 if __name__ == "__main__":
     
     import os
