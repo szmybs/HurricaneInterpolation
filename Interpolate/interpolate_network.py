@@ -228,7 +228,13 @@ class HurricaneInterpolation(InterpolationBase):
 
     def compile(self):
         optimizer = Adam(lr=self.learning_rate, decay=1e-5)
-        self.model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
+        loss = {}
+        for i in range(self.block_nums):
+            loss['img_loss'+str(i)] = 'mse'
+        for i in range(self.block_nums):
+            loss['vec_loss'+str(i)] = 'mse'
+
+        self.model.compile(optimizer=optimizer, loss=loss, metrics=['mae'])
 
 
     def generator(self, data_root_path, mode = 'train'):
