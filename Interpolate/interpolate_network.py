@@ -17,7 +17,7 @@ KTF.set_session(session)
 
 import keras.backend as K
 import keras.initializers as initializers
-from keras.layers import Input, Add
+from keras.layers import Input, Add, Flatten
 from keras.layers.convolutional import Conv1D, Conv2D
 from keras.models import Sequential, Model, save_model, load_model
 from keras.layers import Layer
@@ -33,6 +33,8 @@ from GlowKeras.data_augmentation import rotation90, vertical_flip, mirror_flip
 from GlowKeras.data_augmentation import rotation90_in_list, vertical_flip_in_list, mirror_flip_in_list
 from DataSet.normalize import Normalize, Quantization
 
+import Option
+
 
 class InternalLayer(Layer):
     def __init__(self, parameter_initializer='ones', **kwargs):
@@ -43,7 +45,8 @@ class InternalLayer(Layer):
         self.epsilon = None
 
     def build(self, input_shape):
-        shape = (input_shape[-1], )
+        # shape = (input_shape[-1], )
+        shape = input_shape[1:]
         self.parameter = self.add_weight(shape=shape,
                                         name='parameter',
                                         initializer=self.parameter_initializer,
@@ -53,7 +56,8 @@ class InternalLayer(Layer):
         super(InternalLayer, self).build(input_shape)
 
     def call(self, inputs):
-        return tf.add( tf.multiply(inputs, self.parameter), inputs )
+        # return tf.add( tf.multiply(inputs, self.parameter), inputs )
+        return inputs * self.parameter + inputs
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -79,25 +83,33 @@ class InterpolationBase(object):
 
 
     def build_model(self):
-        inputs = Input(shape=self.data_shape, name='Input')
+        flatten_size = 1
+        for i in self.data_shape:
+            flatten_size = flatten_size * i 
+
+        inputs = Input(shape=(flatten_size, ), name='Input')
         outputs_img = []
         outputs_vec = []
 
-        glow = self.glow_model
         glow_inverse = self.glow_inverse_model
         inter = InternalLayer()
 
-        glow.trainable = False
         glow_inverse.trainable = False
 
-        x = glow
-        for _ in range(self.block_nums):
+        # x = glow(inputs)
+        # x = inter(x)
+        # # x = glow_inverse(x)
+        # outputs = x
+
+        # x = glow(inputs)
+        x = inputs
+        for _ in range(self.block_nums-1):
             x = inter(x)
             y = glow_inverse(x)
-            outputs_img.append(x)
-            outputs_vec.append(y)
+            outputs_vec.append(x)
+            outputs_img.append(y)
+        outputs = outputs_img + outputs_vec
 
-        outputs = outputs_img + outputs_vec 
         return Model(inputs, outputs, name='interpolate_network')
 
 
@@ -124,17 +136,23 @@ class InterpolationBase(object):
 
                     td = train_data_generator.__next__()
                     
-                    ground_truth = td[1:]
-                    for i in td[1:]:
+                    x = self.glow_model.predict(td[0], batch_size=self.batch_size)
+                    ground_truth = td[1]
+                    tmp = []
+                    for i in ground_truth:
                         vec = self.glow_model.predict(i, batch_size=self.batch_size)
-                        ground_truth.append(vec)
-                    loss = self.model.train_on_batch(x=td[0], y=ground_truth)
+                        tmp.append(vec)
+                    y = ground_truth + tmp
 
-                    total_loss = total_loss + loss
+                    loss = self.model.train_on_batch(x=x, y=y)
+                    # loss = self.model.train_on_batch(x=td[0], y=ground_truth[0])
+
+                    total_loss = total_loss + loss[0]
                     mean_loss = total_loss / (step+1)
+                    metric = loss[-1] + loss[-2]
 
                     trainingDuration = time.time() - trainStartTime
-                    print("%d  -  time: %f  -  %d - [loss: %f] - [ml: %f]" % (epoch+1, trainingDuration, step, loss, mean_loss) , end='\r')
+                    print("%d  -  time: %f  -  %d - [loss: %f] - [metric: %f]" % (epoch+1, trainingDuration, step+1, mean_loss, metric) , end='\r')
                 print()
 
                 self.validate(generator=validate_data_generator, steps=steps_per_validate)
@@ -151,9 +169,19 @@ class InterpolationBase(object):
     def validate(self, generator, steps):
         total_loss = 0
         for _ in range(steps):
-            validate_data = generator.__next__()
-            loss = self.model.test_on_batch(x=validate_data[0], y=validate_data[1])
-            total_loss = total_loss + loss
+            vd = generator.__next__()
+
+            x = self.glow_model.predict(vd[0], batch_size=self.batch_size)
+            ground_truth = vd[1]
+            tmp = []
+            for i in ground_truth:
+                vec = self.glow_model.predict(i, batch_size=self.batch_size)
+                tmp.append(vec)
+            y = ground_truth + tmp
+
+            loss = self.model.test_on_batch(x=x, y=y)
+
+            total_loss = total_loss + loss[0]
         mean_loss = total_loss / steps
         print("validate loss : %f" % (mean_loss))
 
@@ -209,7 +237,6 @@ class InterpolationBase(object):
         pass
 
 
-
 class HurricaneInterpolation(InterpolationBase):
     def __init__(self, 
                 batch_size=8, 
@@ -228,13 +255,11 @@ class HurricaneInterpolation(InterpolationBase):
 
     def compile(self):
         optimizer = Adam(lr=self.learning_rate, decay=1e-5)
-        loss = {}
-        for i in range(self.block_nums):
-            loss['img_loss'+str(i)] = 'mse'
-        for i in range(self.block_nums):
-            loss['vec_loss'+str(i)] = 'mse'
-
+        img_loss = ['mse'] * (self.block_nums -1)
+        vec_loss = ['mse'] * (self.block_nums - 1)
+        loss = img_loss + vec_loss
         self.model.compile(optimizer=optimizer, loss=loss, metrics=['mae'])
+        # self.model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
 
 
     def generator(self, data_root_path, mode = 'train'):
@@ -257,14 +282,21 @@ class HurricaneInterpolation(InterpolationBase):
             #在这里正则化
             gdx = self.interpolate_normalize(gdx)
 
-            gadx = [gdx]
+            gadx = []
+            for g in gdx:
+                gadx.append(g.astype(np.float32))
+            gadx = [gadx]
+
             if mode == 'train':
                 for func in self.dam:
                     gadx.append(func(gdx))
 
+            # for dx in gadx:
+            #     dy = dx.reshape( dx.shape[0], -1) 
+            #     yield(dx, dy)
             for dx in gadx:
-                dy = dx.reshape( dx.shape[0], -1) 
-                yield(dx, dy)
+                yield(dx[0], dx[1:])
+
 
 
     def create_norm_list(self, data_root_path, gaussian_path=None, max_min_path=None):
@@ -330,3 +362,23 @@ class HurricaneInterpolation(InterpolationBase):
         steps_per_epoch = math.floor( train_data_nums / (self.batch_size - 1 + self.block_nums) ) * (len(self.dam) + 1)
         steps_for_validate = math.floor( validate_data_nums / (self.batch_size - 1 + self.block_nums) )
         return steps_per_epoch, steps_for_validate
+
+
+
+if __name__ == "__main__":
+    glow = Glow()
+    glow.load_weights(os.path.join(Option.glow_model_path, Option.glow_model_name))
+    glow.create_norm_list(data_root_path=Option.data_root_path, max_min_path=Option.max_min_norm_path)
+
+    hurricane_interpolate = HurricaneInterpolation(batch_size=4, 
+                                                                                                    block_nums=2,
+                                                                                                    glow_model=glow.encoder, 
+                                                                                                    glow_inverse_model=glow.decoder)
+    hurricane_interpolate.train(epochs=2, 
+                                                            sample_interval=1, 
+                                                            tdp=Option.data_root_path, 
+                                                            vdp=Option.data_root_path, 
+                                                            smp=Option.interpolate_model_path, 
+                                                            itp=Option.interpolate_result_path)
+    # tmp = hurricane_interpolate.build_model()
+    # tmp.summary(line_length=150)
