@@ -171,11 +171,11 @@ class InterpolationBase(object):
         for _ in range(steps):
             vd = generator.__next__()
 
-            x = self.glow_model.predict(vd[0], batch_size=self.batch_size)
+            x = self.glow_model.predict(vd[0], batch_size=1)
             ground_truth = vd[1]
             tmp = []
             for i in ground_truth:
-                vec = self.glow_model.predict(i, batch_size=self.batch_size)
+                vec = self.glow_model.predict(i, batch_size=1)
                 tmp.append(vec)
             y = ground_truth + tmp
 
@@ -270,6 +270,7 @@ class HurricaneInterpolation(InterpolationBase):
                                         wbl=[ {'black_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         elif mode == 'validate':
             gg = name_visibility_date_dir_seq_generator(root_path=data_root_path, 
+                                        batch_size=1,
                                         length=self.block_nums,
                                         wbl=[ {'white_list':[self.validate_seperation]}, {'white_list':['Visible']}, {} ])
         else:
