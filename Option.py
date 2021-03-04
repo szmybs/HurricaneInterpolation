@@ -5,9 +5,9 @@ data_root_path = "/home/my/Code/HurricaneInterpolation/DataSet/ScaledData256-Rad
 
 glow_model_path = "/home/my/Code/HurricaneInterpolation/GlowKeras/Model/"
 glow_model_name = "best_encoder.weights"
-interpolate_model_path = ""
+interpolate_model_path = "/home/my/Code/HurricaneInterpolationGit/InterpolateModel/"
 
-interpolate_result_path = ""
+interpolate_result_path = "/home/my/Code/HurricaneInterpolationGit/InterpolateResults/"
 
 gaussian_norm_path = None
 max_min_norm_path = "/home/my/Code/HurricaneInterpolation/DataSet/norm_factor/max_min.npz"

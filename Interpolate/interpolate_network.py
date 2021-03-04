@@ -139,6 +139,7 @@ class InterpolationBase(object):
         self.model.summary(line_length=150)
         self.compile()
 
+        # self.interpolate(generator=validate_data_generator, nums=9, save_path=interpolate_path, suffix_name='demo')
         try:
             for epoch in range(epochs):
                 total_loss = 0
@@ -155,6 +156,7 @@ class InterpolationBase(object):
                     mean_loss = total_loss / (step+1)
                     metric = loss[-1] + loss[-2]
 
+                    time.sleep(0.25)
                     trainingDuration = time.time() - trainStartTime
                     print("%d  -  time: %f  -  %d - [loss: %f] - [metric: %f]" % (epoch+1, trainingDuration, step+1, mean_loss, metric) , end='\r')
                 print()
@@ -184,12 +186,18 @@ class InterpolationBase(object):
     def interpolate(self, generator, nums, save_path, suffix_name):
         for i in range(nums):
             data = generator.__next__()
+
+            ground_truth = data[1]
             x, y = self.pretreatment(data, 1)
 
             outputs = self.model.predict(x, batch_size=1)
-            outputs_img = outputs[:self.block_nums]
+            outputs_img = outputs[:self.block_nums-1]
 
-            print("插值未完成")
+            cache = []
+            for j in range(self.block_nums-1):
+                cache.append(outputs_img[j])
+                cache.append(ground_truth[j])
+            self.nparray_to_image(x=cache, save_path=os.path.join(save_path, suffix_name+'-'+str(i+1)+'.jpg'))
 
 
     def save_weights(self, model, save_path):
@@ -327,7 +335,7 @@ class HurricaneInterpolation(InterpolationBase):
         if isinstance(data, list):
             for d in data:
                 for unnorm in self.undo_norm_list:
-                    data = unnorm(data)
+                    data = unnorm(d)
         else:
             for unnorm in self.undo_norm_list:
                 data = unnorm(data)
@@ -371,10 +379,10 @@ if __name__ == "__main__":
     glow.create_norm_list(data_root_path=Option.data_root_path, max_min_path=Option.max_min_norm_path)
 
     hurricane_interpolate = HurricaneInterpolation(batch_size=4, 
-                                                block_nums=2,
+                                                block_nums=3,
                                                 glow_model=glow.encoder, 
                                                 glow_inverse_model=glow.decoder)
-    hurricane_interpolate.train(epochs=2, 
+    hurricane_interpolate.train(epochs=5, 
                                 sample_interval=1, 
                                 tdp=Option.data_root_path, 
                                 vdp=Option.data_root_path, 
