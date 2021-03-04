@@ -113,6 +113,17 @@ class InterpolationBase(object):
         return Model(inputs, outputs, name='interpolate_network')
 
 
+    def pretreatment(self, data, batch_size):
+        x = self.glow_model.predict(data[0], batch_size=batch_size)
+        ground_truth = data[1]
+        tmp = []
+        for i in ground_truth:
+            vec = self.glow_model.predict(i, batch_size=batch_size)
+            tmp.append(vec)
+        y = ground_truth + tmp
+        return x, y
+
+
     def train(self, epochs=1, sample_interval=5, **kwarg):
         train_data_path = kwarg['tdp']
         validate_data_path = kwarg['vdp']
@@ -136,14 +147,7 @@ class InterpolationBase(object):
 
                     td = train_data_generator.__next__()
                     
-                    x = self.glow_model.predict(td[0], batch_size=self.batch_size)
-                    ground_truth = td[1]
-                    tmp = []
-                    for i in ground_truth:
-                        vec = self.glow_model.predict(i, batch_size=self.batch_size)
-                        tmp.append(vec)
-                    y = ground_truth + tmp
-
+                    x, y = self.pretreatment(td, self.batch_size)
                     loss = self.model.train_on_batch(x=x, y=y)
                     # loss = self.model.train_on_batch(x=td[0], y=ground_truth[0])
 
@@ -170,17 +174,8 @@ class InterpolationBase(object):
         total_loss = 0
         for _ in range(steps):
             vd = generator.__next__()
-
-            x = self.glow_model.predict(vd[0], batch_size=1)
-            ground_truth = vd[1]
-            tmp = []
-            for i in ground_truth:
-                vec = self.glow_model.predict(i, batch_size=1)
-                tmp.append(vec)
-            y = ground_truth + tmp
-
+            x, y = self.pretreatment(vd, 1)
             loss = self.model.test_on_batch(x=x, y=y)
-
             total_loss = total_loss + loss[0]
         mean_loss = total_loss / steps
         print("validate loss : %f" % (mean_loss))
@@ -189,7 +184,11 @@ class InterpolationBase(object):
     def interpolate(self, generator, nums, save_path, suffix_name):
         for i in range(nums):
             data = generator.__next__()
-            outputs = self.model.predict(data, batch_size=1)
+            x, y = self.pretreatment(data, 1)
+
+            outputs = self.model.predict(x, batch_size=1)
+            outputs_img = outputs[:self.block_nums]
+
             print("插值未完成")
 
 
@@ -372,14 +371,14 @@ if __name__ == "__main__":
     glow.create_norm_list(data_root_path=Option.data_root_path, max_min_path=Option.max_min_norm_path)
 
     hurricane_interpolate = HurricaneInterpolation(batch_size=4, 
-                                                                                                    block_nums=2,
-                                                                                                    glow_model=glow.encoder, 
-                                                                                                    glow_inverse_model=glow.decoder)
+                                                block_nums=2,
+                                                glow_model=glow.encoder, 
+                                                glow_inverse_model=glow.decoder)
     hurricane_interpolate.train(epochs=2, 
-                                                            sample_interval=1, 
-                                                            tdp=Option.data_root_path, 
-                                                            vdp=Option.data_root_path, 
-                                                            smp=Option.interpolate_model_path, 
-                                                            itp=Option.interpolate_result_path)
+                                sample_interval=1, 
+                                tdp=Option.data_root_path, 
+                                vdp=Option.data_root_path, 
+                                smp=Option.interpolate_model_path, 
+                                itp=Option.interpolate_result_path)
     # tmp = hurricane_interpolate.build_model()
     # tmp.summary(line_length=150)

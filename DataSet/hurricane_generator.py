@@ -211,4 +211,3 @@ def name_visibility_date_dir_seq_generator_V2(root_path, read_data_func=None, ba
 if __name__ == "__main__":
     pass
 
-
