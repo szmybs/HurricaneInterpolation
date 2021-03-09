@@ -17,7 +17,7 @@ KTF.set_session(session)
 
 import keras.backend as K
 import keras.initializers as initializers
-from keras.layers import Input, Add, Flatten
+from keras.layers import Input, Add, Flatten, Activation
 from keras.layers.convolutional import Conv1D, Conv2D
 from keras.models import Sequential, Model, save_model, load_model
 from keras.layers import Layer
@@ -57,10 +57,20 @@ class InternalLayer(Layer):
 
     def call(self, inputs):
         # return tf.add( tf.multiply(inputs, self.parameter), inputs )
-        return inputs * self.parameter + inputs
+        # return inputs * self.parameter + inputs
+        return inputs * self.parameter
 
     def compute_output_shape(self, input_shape):
         return input_shape
+
+
+def InternelBlock(internal_layer):
+    def f(input):
+        x = internal_layer(input)
+        x = Activation('tanh')(x)
+        x = Add()[x, input]
+        return x
+    return f
 
 
 class InterpolationBase(object):
@@ -92,7 +102,7 @@ class InterpolationBase(object):
         outputs_vec = []
 
         glow_inverse = self.glow_inverse_model
-        inter = InternalLayer()
+        inter = InternalLayer(parameter_initializer='random_uniform')
 
         glow_inverse.trainable = False
 
@@ -102,9 +112,11 @@ class InterpolationBase(object):
         # outputs = x
 
         # x = glow(inputs)
+
         x = inputs
         for _ in range(self.block_nums-1):
-            x = inter(x)
+            # x = inter(x)
+            x = InternelBlock(inter)(x)
             y = glow_inverse(x)
             outputs_vec.append(x)
             outputs_img.append(y)

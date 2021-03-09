@@ -18,9 +18,8 @@ def prettyXml(element, indent, newline, level = 0):
             element.text = newline + indent * (level + 1)      
         else:    
             element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * (level + 1)    
-    # 此处两行如果把注释去掉，Element的text也会另起一行 
-    #else:     
-        #element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * level    
+    else:     
+        element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * level    
     temp = list(element) # 将elemnt转成list    
     for subelement in temp:    
         # 如果不是list的最后一个元素，说明下一个行是同级别元素的起始，缩进应一致
@@ -51,7 +50,6 @@ def WritingVTI(data, save_name):
     image_data.set('Spacing', '1.0 1.0 1.0')
 
     piece = SubElement(image_data, 'Piece')
-    # piece.set('Extent', '0 500 0 479 0 55')
     piece.set('Extent', '0 {height} 0 {width} 0 {length}'.format(length=length, width=width, height=height))
 
     point_data = SubElement(piece, 'PointData')
@@ -69,9 +67,6 @@ def WritingVTI(data, save_name):
         data_str += (str(element) + ' ')
     data_array.text = data_str
     
-    # cell_data = SubElement(piece, 'CellData')
-
-
     prettyXml(vtk_file, '\t', '\n')
 
     tree = ElementTree(vtk_file)
@@ -80,5 +75,5 @@ def WritingVTI(data, save_name):
 
 
 if __name__ == "__main__":
-    data = np.ones(shape=(60, 64, 56)) * 0.67
-    WritingVTI(data, os.path.join(os.getcwd(), "Modeling/XMLTest.vti"))
+    data = np.ones(shape=(3, 3, 3)) * 0.67
+    WritingVTI(data, os.path.join(os.getcwd(), "Modeling/VTIDemo.vti"))
