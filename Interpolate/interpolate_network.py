@@ -68,7 +68,7 @@ def InternelBlock(internal_layer):
     def f(input):
         x = internal_layer(input)
         x = Activation('tanh')(x)
-        x = Add()[x, input]
+        x = Add()([x, input])
         return x
     return f
 

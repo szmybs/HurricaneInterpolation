@@ -1,9 +1,0 @@
-<VTKFile type="ImageData" version="1.0" byte_order="LittleEndian" header_type="UInt64">
-	<ImageData WholeExtent="0 2 0 2 0 2" Origin="0 0 0" Spacing="1.0 1.0 1.0">
-		<Piece Extent="0 2 0 2 0 2">
-			<PointData Scalars="Scalars_">
-				<DataArray type="Float32" Name="Scalars_" format="ascii" RangeMin="0.67" RangeMax="0.67">0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 0.67 </DataArray>
-			</PointData>
-		</Piece>
-	</ImageData>
-</VTKFile>
