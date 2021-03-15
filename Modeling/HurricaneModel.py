@@ -430,7 +430,7 @@ class HurricaneModel(object):
         # 这里是2还是1.1
         ec = IWC * ( a0 + a1/(1.1*radius + 1e-9) )
         # self.extinction_coef += np.where((self.cloud_type == CloudType.IceCloud) | (self.cloud_type == CloudType.CirrusCloud), ec, 0)
-        self.extinction_coef += np.where((self.cloud_type == CloudType.IceCloud) | (self.cloud_type == CloudType.CirrusCloud), 0.025, 0)
+        self.extinction_coef += np.where((self.cloud_type == CloudType.IceCloud) | (self.cloud_type == CloudType.CirrusCloud), 0.0025, 0)
         # print("ec2")
 
 
@@ -537,18 +537,19 @@ class HurricaneModel(object):
         pass
 
     def _export_volumetric_model(self, save_name):
-        zaxis = 10
+        zaxis = 50
         vol = np.ones(shape=(self.shape[0], self.shape[1], zaxis), dtype=np.float32)
 
         # 几何厚度归一化
-        cloud_bottom_height = self.cloud_top_height - self.geo_thickness
-        min_bottom, max_top = np.amin(cloud_bottom_height), np.amax(self.cloud_top_height)
+        cloud_bottom_height = np.where(self.geo_thickness>0, self.cloud_top_height - self.geo_thickness, 0)
+        cloud_top_height = np.where(self.geo_thickness>0, self.cloud_top_height, 0)
+        min_bottom, max_top = np.amin(cloud_bottom_height), np.amax(cloud_top_height)
 
         height_scale = max_top - min_bottom
 
         # norm_thickness = self.geo_thickness / height_scale
         norm_bottom = (cloud_bottom_height - min_bottom) / height_scale
-        norm_top = (self.cloud_top_height  - min_bottom) / height_scale
+        norm_top = (cloud_top_height  - min_bottom) / height_scale
 
         # 消光系数归一化
         max_ext, min_ext = np.amax(self.extinction_coef), np.amin(self.extinction_coef)
@@ -563,16 +564,17 @@ class HurricaneModel(object):
         mask = np.where( (mask >= tmp1) & (mask < tmp2), 1, 0)
 
         vol = np.multiply(vol, np.expand_dims(norm_ext, axis=2).repeat(vol.shape[2], 2))
-        # vol = np.multiply(vol, mask)
+        vol = np.multiply(vol, mask)
 
-        WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest-nomask.vti"))
-        # WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest.vti"))
+        # WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest-nomask.vti"))
+        WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest-254.vti"))
 
 
         
 
 if __name__ == "__main__":
     path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-253\\"
+    # path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-M3C-2541600\\"
     file_names = os.listdir(path)
 
     full_names = []
