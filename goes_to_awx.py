@@ -290,6 +290,7 @@ def load_directory(dirs):
             full_names.append( os.path.join(d, f) )
         gc = GoesCache(files_name=full_names)
         save_to_awx(gc, full_names, 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\AWX_Data\\')
+        print("save : %s" %(d))
 
 
 
@@ -303,6 +304,12 @@ if __name__ == "__main__":
     #         B()
     # A()    
 
-    root = 'D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-253\\'
-    load_directory([root])
+    dirs = []
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M1-2531622\\')
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M1-2541600\\')
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M1-2721600\\')
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M2-2551559\\')
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M2-2581600\\')
+    dirs.append('D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M2-2721600\\')
+    load_directory(dirs)
 

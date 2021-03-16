@@ -73,7 +73,8 @@ class GOES_netCDF(object):
             self.wave_length = []
             for fn in file_names:
                 g16nc = Dataset(fn)
-                self.Rad.append(g16nc.variables['Rad'][:])
+                rad = np.ma.fix_invalid(g16nc.variables['Rad'][:], fill_value=0)
+                self.Rad.append(rad)
                 self.wave_length.append(g16nc.variables['band_wavelength'][:])
 
                 if hasattr(self, 'data_head') == False:

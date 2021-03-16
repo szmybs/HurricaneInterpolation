@@ -4,6 +4,7 @@ import threading
 import math
 from enum import IntEnum
 from scipy.optimize import leastsq
+from numba import jit
 
 import sys
 if __name__ == "__main__":
@@ -14,7 +15,43 @@ from Modeling.zenith_azimuth import solar_satellite_zenith_azimuth_angle
 from Modeling.WritingVTI import WritingVTI
 
 
-debug_mode = True
+debug_mode = False
+
+
+
+@jit(nopython=True)
+def numba_least_sq(x, y, scope, shape, mask, slope_map, offset_map):
+    # for i in range(x.shape[0]):
+    #     for j in range(x.shape[1]):
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            
+            if mask[i, j] == 0:
+                continue
+
+            xsum, ysum = 0, 0
+            xmuly = 0
+            xsq = 0
+
+            nscope = 2 * scope + 1
+            for m in range(nscope):
+                for n in range(nscope):
+                    xsum = xsum + x[i+m, j+n] 
+                    ysum = ysum + y[i+m, j+n]
+                    xmuly = xmuly + x[i+m, j+n] * y[i+m, j+n]
+                    xsq = xsq + x[i+m, j+n] * x[i+m, j+n]
+            
+            xav = xsum / nscope
+            yav = ysum / nscope
+            xsumsq = (xsum * xsum) / nscope
+            yxav = xav * ysum
+
+            w = (xmuly - yxav) / (xsq - xsumsq)
+            b = yav - xav * w
+
+            slope_map[i, j] = w
+            offset_map[i, j] = b
+    return slope_map, offset_map
 
 
 class CloudType(IntEnum):
@@ -45,6 +82,8 @@ class HurricaneModel(object):
         # Band 7 ~ 16 : 7,9,14,15
         self.tempEMI = self.conversion_radiances_to_brightness_temperature(self.g16nc.Rad[1:])
         self._convsersion_bands_nums()
+        self.tempIR1 = np.asarray(self.tempIR1)
+        self.tempIR2 = np.asarray(self.tempIR2)
 
         # 计算天顶角 方位角
         self.solar_zenith_angle, self.solar_azimuth_angle, self.satellite_zenith_angle, self.satellite_azimuth_angle = solar_satellite_zenith_azimuth_angle(self.g16nc)
@@ -230,6 +269,7 @@ class HurricaneModel(object):
             x = np.multiply( np.square(np.multiply(3*(1-g), beta)), mwir_thickness)
             y = 4 * np.square( np.divide( beta, 3*(1-g) ) )
 
+            # print(np.amax(x))
             t = np.divide( np.sinh(y), np.sinh(1.07*y + x) )
             delta = np.divide( np.multiply(4.86 - 13.08*mu_mul_mu0 + 12.76*np.square(mu_mul_mu0), np.exp(x)), np.power(mwir_thickness, 3) )
             tmd = t - delta
@@ -378,6 +418,7 @@ class HurricaneModel(object):
         # 云的几何厚度
         self.geo_thickness = np.divide(self.vis_thickness, self.extinction_coef + 1e-9)
         self.geo_thickness = np.where(self.geo_thickness < 0, 0, self.geo_thickness)
+        self.geo_thickness = np.where(self.geo_thickness < self.cloud_top_height, self.geo_thickness, self.cloud_top_height * 0.5)
 
 
     # 根据原代码使用LWP和LWC计算消光系数 - flag == 1
@@ -434,29 +475,41 @@ class HurricaneModel(object):
         # print("ec2")
 
 
+    # #@jit(nopython=True)
+    # def _numba_get_slope(self, x, y, scope, slope_map, offset_map):
+    #     for i in range(x.shape[0]):
+    #         for j in range(x.shape[1]):
+                
+    #             if self.has_cloud[i][j] <= 0:
+    #                 continue
+    #             up, left = max(i-scope, 0), max(j-scope, 0)
+    #             down, right = i+scope, j+scope
+    #             # IR1_child = self.tempIR1[up:down+1][left:right+1]
+    #             # WV_child = self.tempWV[up:down+1][left:right+1]
+
+    #             x_child = x[up:down+1, left:right+1]
+    #             y_child = y[up:down+1, left:right+1]
+
+    #             k, b = self._least_square(x_child, y_child)
+    #             slope_map[i][j] = k
+    #             offset_map[i][j] = b
+    #     return slope_map, offset_map
+
+
     def _get_slope(self, x, y, scope):
         assert x.ndim == 2 and y.ndim == 2 and x.shape == y.shape
 
         slope_map = np.zeros(shape=x.shape)
         offset_map = np.zeros(shape=x.shape)
-        for i in range(x.shape[0]):
-            for j in range(x.shape[1]):
-                
-                if self.has_cloud[i][j] <= 0:
-                    continue
-                up, left = max(i-scope, 0), max(j-scope, 0)
-                down, right = i+scope, j+scope
-                # IR1_child = self.tempIR1[up:down+1][left:right+1]
-                # WV_child = self.tempWV[up:down+1][left:right+1]
 
-                x_child = x[up:down+1, left:right+1]
-                y_child = y[up:down+1, left:right+1]
-
-                k, b = self._least_square(x_child, y_child)
-                slope_map[i][j] = k
-                offset_map[i][j] = b
-
+        # slope_map, offset_map = self._numba_get_slope(x, y, scope, slope_map, offset_map)
+        nx = np.zeros(shape=(x.shape[0]+2*scope, x.shape[1]+2*scope), dtype=np.float32)
+        ny = np.zeros(shape=(y.shape[0]+2*scope, y.shape[1]+2*scope), dtype=np.float32)
+        nx[scope:-scope, scope:-scope] = x
+        ny[scope:-scope, scope:-scope] = y
+        slope_map, offset_map = numba_least_sq(nx, ny, scope, x.shape, self.has_cloud, slope_map, offset_map)
         return slope_map, offset_map
+
 
     def _least_square(self, x, y): 
         x = x.flatten()
@@ -567,14 +620,14 @@ class HurricaneModel(object):
         vol = np.multiply(vol, mask)
 
         # WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest-nomask.vti"))
-        WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/XMLTest-254.vti"))
+        WritingVTI(data=vol, save_name=os.path.join(os.getcwd(), "Modeling/M2-2551559.vti"))
 
 
         
 
 if __name__ == "__main__":
-    path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-253\\"
-    # path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-M3C-2541600\\"
+    # path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\OR_ABI-L1b-RadM1-253\\"
+    path = "D:\\Code\\GOES-R-2017-HurricaneExtraction\\Data\\M1-2541600\\"
     file_names = os.listdir(path)
 
     full_names = []
